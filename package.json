@@ -1,0 +1,17 @@
+{
+  "name": "spel2-typescript-definitions",
+  "version": "1.0.0",
+  "description": "definitios of spel2 modding stuff for TypeScriptToLua",
+  "scripts": {
+    "build": "tstl",
+    "dev": "tstl --watch"
+  },
+  "files": [
+    "**/*.d.ts"
+  ],
+  "author": "Estebanfer",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript-to-lua": "^1.3.3"
+  }
+}
