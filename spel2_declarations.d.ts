@@ -1,260 +1,1086 @@
 /** @noSelfInFile */
-declare interface meta {
+declare interface Meta {
     name: string;
     version: string;
     description: string;
     author: string;
 }
+declare let meta: Meta;
+
 declare const state: StateMemory;
 declare const game_manager: GameManager;
 declare const online: Online;
 declare const players: Array<Player>;
 declare const savegame: SaveData;
-declare const options: unknown;
+declare const options: any;
 declare const prng: PRNG;
 declare interface Callback {
-    /** @noself **/
-    (...args: any[]): void;
+    (...args: any[]): any;
 }
 declare interface SoundCallbackFunction extends Callback {}
+
 //## Functions
-//Note: The game functions like `spawn` use [level coordinates](#get_position). Draw functions use normalized [screen coordinates](#screen_position) from `-1.0 .. 1.0` where `0.0, 0.0` is the center of the screen.
+
+/** 
+Standard lua print function, prints directly to the console but not to the game
+ */
 declare function lua_print() : void
+/** 
+Print a log message on screen.
+ */
 declare function print(message: string) : void
+/** 
+Same as `print`
+ */
 declare function message(message: string) : void
+/** 
+Prints any type of object by first funneling it through `inspect`, no need for a manual `tostring` or `inspect`.
+For example use it like this
+```lua
+prinspect(state.level, state.level_next)
+local some_stuff_in_a_table = {
+    some = state.time_total,
+    stuff = state.world
+}
+prinspect(some_stuff_in_a_table)
+```
+ */
 declare function prinspect(...objects: any[]) : void
+/** 
+Same as `prinspect`
+ */
 declare function messpect(...objects: any[]) : void
+/** 
+Adds a command that can be used in the console.
+ */
 declare function register_console_command(name: string, cmd: Callback) : void
+/** 
+Returns unique id for the callback to be used in [clear_callback](#clear_callback). You can also return `false` from your function to clear the callback.
+Add per level callback function to be called every `frames` engine frames. Timer is paused on pause and cleared on level transition.
+ */
 declare function set_interval(cb: Callback, frames: number) : CallbackId
+/** 
+Returns unique id for the callback to be used in [clear_callback](#clear_callback).
+Add per level callback function to be called after `frames` engine frames. Timer is paused on pause and cleared on level transition.
+ */
 declare function set_timeout(cb: Callback, frames: number) : CallbackId
+/** 
+Returns unique id for the callback to be used in [clear_callback](#clear_callback). You can also return `false` from your function to clear the callback.
+Add global callback function to be called every `frames` engine frames. This timer is never paused or cleared.
+ */
 declare function set_global_interval(cb: Callback, frames: number) : CallbackId
+/** 
+Returns unique id for the callback to be used in [clear_callback](#clear_callback).
+Add global callback function to be called after `frames` engine frames. This timer is never paused or cleared.
+ */
 declare function set_global_timeout(cb: Callback, frames: number) : CallbackId
+/** 
+Returns unique id for the callback to be used in [clear_callback](#clear_callback).
+Add global callback function to be called on an [event](#on).
+ */
 declare function set_callback(cb: Callback, screen: number) : CallbackId
+/** 
+Clear previously added callback `id`
+ */
 declare function clear_callback(id: CallbackId) : void
+/** 
+Load another script by id "author/name"
+ */
 declare function load_script(id: string) : void
+/** 
+Read the game prng state. Maybe you can use these and math.randomseed() to make deterministic things, like online scripts :shrug:. Example:
+```lua
+-- this should always print the same table D877...E555
+set_callback(function()
+  seed_prng(42069)
+  local prng = read_prng()
+  for i,v in ipairs(prng) do
+    message(string.format("%08X", v))
+  end
+end, ON.LEVEL)
+```
+ */
 declare function read_prng() : Array<number>
+/** 
+Show a message that looks like a level feeling.
+ */
 declare function toast(message: string) : void
+/** 
+Show a message coming from an entity
+ */
 declare function say(entity_uid: number, message: string, unk_type: number, top: boolean) : void
+/** 
+Add an integer option that the user can change in the UI. Read with `options.name`, `value` is the default. Keep in mind these are just soft
+limits, you can override them in the UI with double click.
+ */
 declare function register_option_int(name: string, desc: string, long_desc: string, value: number, min: number, max: number) : void
+/** 
+Add a float option that the user can change in the UI. Read with `options.name`, `value` is the default. Keep in mind these are just soft
+limits, you can override them in the UI with double click.
+ */
 declare function register_option_float(name: string, desc: string, long_desc: string, value: number, min: number, max: number) : void
+/** 
+Add a boolean option that the user can change in the UI. Read with `options.name`, `value` is the default.
+ */
 declare function register_option_bool(name: string, desc: string, long_desc: string, value: boolean) : void
+/** 
+Add a string option that the user can change in the UI. Read with `options.name`, `value` is the default.
+ */
 declare function register_option_string(name: string, desc: string, long_desc: string, value: string) : void
+/** 
+Add a combobox option that the user can change in the UI. Read the int index of the selection with `options.name`. Separate `opts` with `\0`,
+with a double `\0\0` at the end.
+ */
 declare function register_option_combo(name: string, desc: string, long_desc: string, opts: string) : void
+/** 
+Add a button that the user can click in the UI. Sets the timestamp of last click on value and runs the callback function.
+ */
 declare function register_option_button(name: string, desc: string, long_desc: string, on_click: Callback) : void
+/** 
+Spawn liquids, always spawns in the front layer, will have fun effects if `entity_type` is not a liquid (only the short version, without velocity etc.).
+Don't overuse this, you are still restricted by the liquid pool sizes and thus might crash the game.
+`liquid_flags` - not much known about, 2 - will probably crash the game, 3 - pause_physics, 6-12 is probably agitation, surface_tension etc. set to 0 to ignore
+`amount` - it will spawn amount x amount (so 1 = 1, 2 = 4, 3 = 6 etc.), `blobs_separation` is optional
+ */
 declare function spawn_liquid(entity_type: ENT_TYPE, x: number, y: number) : void
+/** 
+Spawn liquids, always spawns in the front layer, will have fun effects if `entity_type` is not a liquid (only the short version, without velocity etc.).
+Don't overuse this, you are still restricted by the liquid pool sizes and thus might crash the game.
+`liquid_flags` - not much known about, 2 - will probably crash the game, 3 - pause_physics, 6-12 is probably agitation, surface_tension etc. set to 0 to ignore
+`amount` - it will spawn amount x amount (so 1 = 1, 2 = 4, 3 = 6 etc.), `blobs_separation` is optional
+ */
 declare function spawn_liquid(entity_type: ENT_TYPE, x: number, y: number, velocityx: number, velocityy: number, liquid_flags: number, amount: number, blobs_separation: number) : void
+/** 
+Spawn an entity in position with some velocity and return the uid of spawned entity.
+Uses level coordinates with [LAYER.FRONT](#layer) and LAYER.BACK, but player-relative coordinates with LAYER.PLAYERn.
+Example:
+```lua
+-- spawn megajelly using absolute coordinates
+set_callback(function()
+    x, y, layer = get_position(players[1].uid)
+    spawn_entity(ENT_TYPE.MONS_MEGAJELLYFISH, x, y+3, layer, 0, 0)
+end, ON.LEVEL)
+-- spawn clover using player-relative coordinates
+set_callback(function()
+    spawn(ENT_TYPE.ITEM_PICKUP_CLOVER, 0, 1, LAYER.PLAYER1, 0, 0)
+end, ON.LEVEL)
+```
+ */
 declare function spawn_entity(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER, vx: number, vy: number) : number
+/** 
+Short for [spawn_entity](#spawn_entity).
+ */
 declare function spawn(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER, vx: number, vy: number) : number
+/** 
+Spawns an entity directly on the floor below the tile at the given position.
+Use this to avoid the little fall that some entities do when spawned during level gen callbacks.
+ */
 declare function spawn_entity_snapped_to_floor(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER) : number
+/** 
+Short for [spawn_entity_snapped_to_floor](#spawn_entity_snapped_to_floor).
+ */
 declare function spawn_on_floor(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER) : number
+/** 
+Spawn a grid entity, such as floor or traps, that snaps to the grid.
+ */
 declare function spawn_grid_entity(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER) : number
+/** 
+Same as `spawn_entity` but does not trigger any pre-entity-spawn callbacks, so it will not be replaced by another script
+ */
 declare function spawn_entity_nonreplaceable(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER, vx: number, vy: number) : number
+/** 
+Short for [spawn_entity_nonreplaceable](#spawn_entity_nonreplaceable).
+ */
 declare function spawn_critical(entity_type: ENT_TYPE, x: number, y: number, layer: LAYER, vx: number, vy: number) : number
+/** 
+Spawn a door to another world, level and theme and return the uid of spawned entity.
+Uses level coordinates with LAYER.FRONT and LAYER.BACK, but player-relative coordinates with LAYER.PLAYERn
+ */
 declare function spawn_door(x: number, y: number, layer: LAYER, w: number, l: number, t: number) : number
+/** 
+Short for [spawn_door](#spawn_door).
+ */
 declare function door(x: number, y: number, layer: LAYER, w: number, l: number, t: number) : number
+/** 
+Spawn a door to backlayer.
+ */
 declare function spawn_layer_door(x: number, y: number) : void
+/** 
+Short for [spawn_layer_door](#spawn_layer_door).
+ */
 declare function layer_door(x: number, y: number) : void
+/** 
+Spawns apep with the choice if it going left or right, if you want the game to choose use regular spawn functions with `ENT_TYPE.MONS_APEP_HEAD`
+ */
 declare function spawn_apep(x: number, y: number, layer: LAYER, right: boolean) : number
+/** 
+Spawns and grows a tree
+ */
 declare function spawn_tree(x: number, y: number, layer: LAYER) : void
+/** 
+Spawn a player in given location, if player of that slot already exist it will spawn clone, the game may crash as this is very unexpected situation
+If you want to respawn a player that is a ghost, set in his inventory `health` to above 0, and `time_of_death` to 0 and call this function, the ghost entity will be removed automatically
+ */
 declare function spawn_player(player_slot: number, x: number, y: number) : void
+/** 
+Add a callback for a spawn of specific entity types or mask. Set `mask` to `MASK.ANY` to ignore that.
+This is run before the entity is spawned, spawn your own entity and return its uid to replace the intended spawn.
+In many cases replacing the intended entity won't have the indended effect or will even break the game, so use only if you really know what you're doing.
+The callback signature is `optional<int> pre_entity_spawn(entity_type, x, y, layer, overlay_entity, spawn_flags)`
+ */
 declare function set_pre_entity_spawn(cb: Callback, flags: SPAWN_TYPE, mask: number, ...entity_types: any[]) : CallbackId
+/** 
+Add a callback for a spawn of specific entity types or mask. Set `mask` to `MASK.ANY` to ignore that.
+This is run right after the entity is spawned but before and particular properties are changed, e.g. owner or velocity.
+The callback signature is `nil post_entity_spawn(entity, spawn_flags)`
+ */
 declare function set_post_entity_spawn(cb: Callback, flags: SPAWN_TYPE, mask: number, ...entity_types: any[]) : CallbackId
+/** 
+Warp to a level immediately.
+ */
 declare function warp(w: number, l: number, t: number) : void
+/** 
+Set seed and reset run.
+ */
 declare function set_seed(seed: number) : void
+/** 
+Enable/disable godmode for players.
+ */
 declare function god(g: boolean) : void
+/** 
+Enable/disable godmode for companions.
+ */
 declare function god_companions(g: boolean) : void
+/** 
+Set the zoom level used in levels and shops. 13.5 is the default.
+ */
 declare function zoom(level: number) : void
+/** 
+Enable/disable game engine pause.
+ */
 declare function pause(p: boolean) : void
+/** 
+Teleport entity to coordinates with optional velocity
+ */
 declare function move_entity(uid: number, x: number, y: number, vx: number, vy: number) : void
+/** 
+Teleport entity to coordinates with optional velocity
+ */
 declare function move_entity(uid: number, x: number, y: number, vx: number, vy: number, layer: LAYER) : void
+/** 
+Teleport grid entity, the destination should be whole number, this ensures that the collisions will work properly
+ */
 declare function move_grid_entity(uid: number, x: number, y: number, layer: LAYER) : void
+/** 
+Make an ENT_TYPE.FLOOR_DOOR_EXIT go to world `w`, level `l`, theme `t`
+ */
 declare function set_door_target(uid: number, w: number, l: number, t: number) : void
+/** 
+Short for [set_door_target](#set_door_target).
+ */
 declare function set_door(uid: number, w: number, l: number, t: number) : void
-declare function get_door_target(uid: number) : [number, number, number]
+/** 
+Get door target `world`, `level`, `theme`
+ */
+declare function get_door_target(uid: number) : LuaMultiReturn<[number, number, number]>
+/** 
+Set the contents of ENT_TYPE.ITEM_POT, ENT_TYPE.ITEM_CRATE or ENT_TYPE.ITEM_COFFIN `uid` to ENT_TYPE... `item_entity_type`
+ */
 declare function set_contents(uid: number, item_entity_type: ENT_TYPE) : void
+/** 
+Get the [Entity](#entity) behind an uid, converted to the correct type. To see what type you will get, consult the [entity hierarchy list](entities-hierarchy.md)
+ */
 declare function get_entity(uid: number) : Entity
+/** 
+Get the [EntityDB](#entitydb) behind an ENT_TYPE...
+ */
 declare function get_type(id: number) : EntityDB
+/** 
+Gets a grid entity, such as floor or spikes, at the given position and layer.
+ */
 declare function get_grid_entity_at(x: number, y: number, layer: LAYER) : number
+/** 
+Returns a list of all uids in `entities` for which `predicate(get_entity(uid))` returns true
+ */
 declare function filter_entities(entities: Array<number>, predicate: Callback) : Array<number>
+/** 
+Get uids of entities by some conditions. Set `entity_type` or `mask` to `0` to ignore that, can also use table of entity_types
+ */
 declare function get_entities_by(entity_types: Array<ENT_TYPE>, mask: number, layer: LAYER) : Array<number>
+/** 
+Get uids of entities by some conditions. Set `entity_type` or `mask` to `0` to ignore that, can also use table of entity_types
+ */
 declare function get_entities_by(entity_type: ENT_TYPE, mask: number, layer: LAYER) : Array<number>
+/** 
+Get uids of entities matching id. This function is variadic, meaning it accepts any number of id's.
+You can even pass a table! Example:
+```lua
+types = {ENT_TYPE.MONS_SNAKE, ENT_TYPE.MONS_BAT}
+function on_level()
+    uids = get_entities_by_type(ENT_TYPE.MONS_SNAKE, ENT_TYPE.MONS_BAT)
+    -- is not the same thing as this, but also works
+    uids2 = get_entities_by_type(entity_types)
+    message(tostring(#uids).." == "..tostring(#uids2))
+end
+```
+ */
 declare function get_entities_by_type(...ent_type: any[]) : Array<number>
+/** 
+Get uids of matching entities inside some radius. Set `entity_type` or `mask` to `0` to ignore that, can also use table of entity_types
+ */
 declare function get_entities_at(entity_types: Array<ENT_TYPE>, mask: number, x: number, y: number, layer: LAYER, radius: number) : Array<number>
+/** 
+Get uids of matching entities inside some radius. Set `entity_type` or `mask` to `0` to ignore that, can also use table of entity_types
+ */
 declare function get_entities_at(entity_type: ENT_TYPE, mask: number, x: number, y: number, layer: LAYER, radius: number) : Array<number>
+/** 
+Get uids of matching entities overlapping with the given hitbox. Set `entity_type` or `mask` to `0` to ignore that, can also use table of entity_types
+ */
 declare function get_entities_overlapping_hitbox(entity_types: Array<ENT_TYPE>, mask: number, hitbox: AABB, layer: LAYER) : Array<number>
+/** 
+Get uids of matching entities overlapping with the given hitbox. Set `entity_type` or `mask` to `0` to ignore that, can also use table of entity_types
+ */
 declare function get_entities_overlapping_hitbox(entity_type: ENT_TYPE, mask: number, hitbox: AABB, layer: LAYER) : Array<number>
+/** 
+Attaches `attachee` to `overlay`, similar to setting `get_entity(attachee).overlay = get_entity(overlay)`.
+However this function offsets `attachee` (so you don't have to) and inserts it into `overlay`'s inventory.
+ */
 declare function attach_entity(overlay_uid: number, attachee_uid: number) : void
+/** 
+Get the `flags` field from entity by uid
+ */
 declare function get_entity_flags(uid: number) : number
+/** 
+Set the `flags` field from entity by uid
+ */
 declare function set_entity_flags(uid: number, flags: number) : void
+/** 
+Get the `more_flags` field from entity by uid
+ */
 declare function get_entity_flags2(id: number) : number
+/** 
+Set the `more_flags` field from entity by uid
+ */
 declare function set_entity_flags2(uid: number, flags: number) : void
+/** 
+Get `state.level_flags`
+ */
 declare function get_level_flags() : number
+/** 
+Set `state.level_flags`
+ */
 declare function set_level_flags(flags: number) : void
+/** 
+Get the ENT_TYPE... of the entity by uid
+ */
 declare function get_entity_type(uid: number) : ENT_TYPE
+/** 
+Get the current set zoom level
+ */
 declare function get_zoom_level() : number
-declare function game_position(x: number, y: number) : [number, number]
-declare function screen_position(x: number, y: number) : [number, number]
+/** 
+Get the game coordinates at the screen position (`x`, `y`)
+ */
+declare function game_position(x: number, y: number) : LuaMultiReturn<[number, number]>
+/** 
+Translate an entity position to screen position to be used in drawing functions
+ */
+declare function screen_position(x: number, y: number) : LuaMultiReturn<[number, number]>
+/** 
+Translate a distance of `x` tiles to screen distance to be be used in drawing functions
+ */
 declare function screen_distance(x: number) : number
-declare function get_position(uid: number) : [number, number, number]
-declare function get_render_position(uid: number) : [number, number, number]
-declare function get_velocity(uid: number) : [number, number]
+/** 
+Get position `x, y, layer` of entity by uid. Use this, don't use `Entity.x/y` because those are sometimes just the offset to the entity
+you're standing on, not real level coordinates.
+ */
+declare function get_position(uid: number) : LuaMultiReturn<[number, number, number]>
+/** 
+Get interpolated render position `x, y, layer` of entity by uid. This gives smooth hitboxes for 144Hz master race etc...
+ */
+declare function get_render_position(uid: number) : LuaMultiReturn<[number, number, number]>
+/** 
+Get velocity `vx, vy` of an entity by uid. Use this, don't use `Entity.velocityx/velocityy` because those are relative to `Entity.overlay`.
+ */
+declare function get_velocity(uid: number) : LuaMultiReturn<[number, number]>
+/** 
+Remove item by uid from entity
+ */
 declare function entity_remove_item(id: number, item_uid: number) : void
+/** 
+Spawns and attaches ball and chain to `uid`, the initial position of the ball is at the entity position plus `off_x`, `off_y`
+ */
 declare function attach_ball_and_chain(uid: number, off_x: number, off_y: number) : number
+/** 
+Spawn an entity of `entity_type` attached to some other entity `over_uid`, in offset `x`, `y`
+ */
 declare function spawn_entity_over(entity_type: ENT_TYPE, over_uid: number, x: number, y: number) : number
+/** 
+Short for [spawn_entity_over](#spawn_entity_over)
+ */
 declare function spawn_over(entity_type: ENT_TYPE, over_uid: number, x: number, y: number) : number
+/** 
+Check if the entity `uid` has some specific `item_uid` by uid in their inventory
+ */
 declare function entity_has_item_uid(uid: number, item_uid: number) : boolean
+/** 
+Check if the entity `uid` has some ENT_TYPE `entity_type` in their inventory, can also use table of entity_types
+ */
 declare function entity_has_item_type(uid: number, entity_types: Array<ENT_TYPE>) : boolean
+/** 
+Check if the entity `uid` has some ENT_TYPE `entity_type` in their inventory, can also use table of entity_types
+ */
 declare function entity_has_item_type(uid: number, entity_type: ENT_TYPE) : boolean
+/** 
+Gets uids of entities attached to given entity uid. Use `entity_type` and `mask` to filter, set them to 0 to return all attached entities.
+ */
 declare function entity_get_items_by(uid: number, entity_types: Array<ENT_TYPE>, mask: number) : Array<number>
+/** 
+Gets uids of entities attached to given entity uid. Use `entity_type` and `mask` to filter, set them to 0 to return all attached entities.
+ */
 declare function entity_get_items_by(uid: number, entity_type: ENT_TYPE, mask: number) : Array<number>
+/** 
+Kills an entity by uid. `destroy_corpse` defaults to `true`, if you are killing for example a caveman and want the corpse to stay make sure to pass `false`.
+ */
 declare function kill_entity(uid: number, destroy_corpse: boolean | undefined) : void
+/** 
+Pick up another entity by uid. Make sure you're not already holding something, or weird stuff will happen. Example:
+```lua
+-- spawn and equip a jetpack
+pick_up(players[1].uid, spawn(ENT_TYPE.ITEM_JETPACK, 0, 0, LAYER.PLAYER, 0, 0))
+```
+ */
 declare function pick_up(who_uid: number, what_uid: number) : void
+/** 
+Drop an entity by uid
+ */
 declare function drop(who_uid: number, what_uid: number) : void
+/** 
+Unequips the currently worn backitem
+ */
 declare function unequip_backitem(who_uid: number) : void
+/** 
+Returns the uid of the currently worn backitem, or -1 if wearing nothing
+ */
 declare function worn_backitem(who_uid: number) : number
+/** 
+Apply changes made in [get_type](#get_type)() to entity instance by uid.
+ */
 declare function apply_entity_db(uid: number) : void
+/** 
+Try to lock the exit at coordinates
+ */
 declare function lock_door_at(x: number, y: number) : void
+/** 
+Try to unlock the exit at coordinates
+ */
 declare function unlock_door_at(x: number, y: number) : void
+/** 
+Get the current global frame count since the game was started. You can use this to make some timers yourself, the engine runs at 60fps.
+ */
 declare function get_frame() : number
+/** 
+Get the current timestamp in milliseconds since the Unix Epoch.
+ */
 declare function get_ms() : void
+/** 
+Make `mount_uid` carry `rider_uid` on their back. Only use this with actual mounts and living things.
+ */
 declare function carry(mount_uid: number, rider_uid: number) : void
+/** 
+Sets the amount of blood drops in the Kapala needed to trigger a health increase (default = 7).
+ */
 declare function set_kapala_blood_threshold(threshold: number) : void
+/** 
+Sets the hud icon for the Kapala (0-6 ; -1 for default behaviour).
+If you set a Kapala treshold greater than 7, make sure to set the hud icon in the range 0-6, or other icons will appear in the hud!
+ */
 declare function set_kapala_hud_icon(icon_index: number) : void
+/** 
+Changes characteristics of (all) sparktraps: speed, rotation direction and distance from center
+Speed: expressed as the amount that should be added to the angle every frame (use a negative number to go in the other direction)
+Distance from center: if you go above 3.0 the game might crash because a spark may go out of bounds!
+ */
 declare function modify_sparktraps(angle_increment: number, distance: number) : void
+/** 
+Sets the multiplication factor for blood droplets upon death (default/no Vlad's cape = 1, with Vlad's cape = 2)
+Due to changes in 1.23.x only the Vlad's cape value you provide will be used. The default is automatically Vlad's cape value - 1
+ */
 declare function set_blood_multiplication(default_multiplier: number, vladscape_multiplier: number) : void
+/** 
+Flip entity around by uid. All new entities face right by default.
+ */
 declare function flip_entity(uid: number) : void
+/** 
+Sets the Y-level at which Olmec changes phases
+ */
 declare function set_olmec_phase_y_level(phase: number, y: number) : void
+/** 
+Forces Olmec to stay on phase 0 (stomping)
+ */
 declare function force_olmec_phase_0(b: boolean) : void
+/** 
+Determines when the ghost appears, either when the player is cursed or not
+ */
 declare function set_ghost_spawn_times(normal: number, cursed: number) : void
+/** 
+Determines whether the time ghost appears, including the showing of the ghost toast
+ */
 declare function set_time_ghost_enabled(b: boolean) : void
+/** 
+Determines whether the time jelly appears in cosmic ocean
+ */
 declare function set_time_jelly_enabled(b: boolean) : void
+/** 
+Enables or disables the journal
+ */
 declare function set_journal_enabled(b: boolean) : void
+/** 
+Enables or disables the default position based camp camera bounds, to set them manually yourself
+ */
 declare function set_camp_camera_bounds_enabled(b: boolean) : void
+/** 
+Sets which entities are affected by a bomb explosion. Default = MASK.PLAYER | MASK.MOUNT | MASK.MONSTER | MASK.ITEM | MASK.ACTIVEFLOOR | MASK.FLOOR
+ */
 declare function set_explosion_mask(mask: number) : void
+/** 
+Sets the maximum length of a thrown rope (anchor segment not included). Unfortunately, setting this higher than default (6) creates visual glitches in the rope, even though it is fully functional.
+ */
 declare function set_max_rope_length(length: number) : void
+/** 
+Checks whether a coordinate is inside a room containing an active shop. This function checks whether the shopkeeper is still alive.
+ */
 declare function is_inside_active_shop_room(x: number, y: number, layer: LAYER) : boolean
+/** 
+Checks whether a coordinate is inside a shop zone, the rectangle where the camera zooms in a bit. Does not check if the shop is still active!
+ */
 declare function is_inside_shop_zone(x: number, y: number, layer: LAYER) : boolean
+/** 
+Returns how many of a specific entity type Waddler has stored
+ */
 declare function waddler_count_entity(entity_type: ENT_TYPE) : number
+/** 
+Store an entity type in Waddler's storage. Returns the slot number the item was stored in or -1 when storage is full and the item couldn't be stored.
+ */
 declare function waddler_store_entity(entity_type: ENT_TYPE) : number
+/** 
+Removes an entity type from Waddler's storage. Second param determines how many of the item to remove (default = remove all)
+ */
 declare function waddler_remove_entity(entity_type: ENT_TYPE, amount_to_remove: number) : void
+/** 
+Gets the 16-bit meta-value associated with the entity type in the associated slot
+ */
 declare function waddler_get_entity_meta(slot: number) : number
+/** 
+Sets the 16-bit meta-value associated with the entity type in the associated slot
+ */
 declare function waddler_set_entity_meta(slot: number, meta: number) : void
+/** 
+Gets the entity type of the item in the provided slot
+ */
 declare function waddler_entity_type_in_slot(slot: number) : number
+/** 
+Spawn a companion (hired hand, player character, eggplant child)
+ */
 declare function spawn_companion(companion_type: ENT_TYPE, x: number, y: number, layer: LAYER) : number
+/** 
+Calculate the tile distance of two entities by uid
+ */
 declare function distance(uid_a: number, uid_b: number) : number
-declare function get_bounds() : [number, number, number, number]
-declare function get_camera_position() : [number, number]
+/** 
+Basically gets the absolute coordinates of the area inside the unbreakable bedrock walls, from wall to wall. Every solid entity should be
+inside these boundaries. The order is: top left x, top left y, bottom right x, bottom right y Example:
+```lua
+-- Draw the level boundaries
+set_callback(function(draw_ctx)
+    xmin, ymin, xmax, ymax = get_bounds()
+    sx, sy = screen_position(xmin, ymin) -- top left
+    sx2, sy2 = screen_position(xmax, ymax) -- bottom right
+    draw_ctx:draw_rect(sx, sy, sx2, sy2, 4, 0, rgba(255, 255, 255, 255))
+end, ON.GUIFRAME)
+```
+ */
+declare function get_bounds() : LuaMultiReturn<[number, number, number, number]>
+/** 
+Gets the current camera position in the level
+ */
+declare function get_camera_position() : LuaMultiReturn<[number, number]>
+/** 
+Set a bit in a number. This doesn't actually change the bit in the entity you pass it, it just returns the new value you can use.
+ */
 declare function set_flag(flags: Flags, bit: number) : Flags
 declare function setflag() : void
+/** 
+Clears a bit in a number. This doesn't actually change the bit in the entity you pass it, it just returns the new value you can use.
+ */
 declare function clr_flag(flags: Flags, bit: number) : Flags
 declare function clrflag() : void
+/** 
+Returns true if a bit is set in the flags
+ */
 declare function test_flag(flags: Flags, bit: number) : boolean
 declare function testflag() : void
-declare function get_window_size() : [number, number]
+/** 
+Gets the resolution (width and height) of the screen
+ */
+declare function get_window_size() : LuaMultiReturn<[number, number]>
+/** 
+Steal input from a Player or HH.
+ */
 declare function steal_input(uid: number) : void
+/** 
+Return input
+ */
 declare function return_input(uid: number) : void
+/** 
+Send input
+ */
 declare function send_input(uid: number, buttons: INPUTS) : void
+/** 
+Read input
+ */
 declare function read_input(uid: number) : INPUTS
+/** 
+Read input that has been previously stolen with steal_input
+ */
 declare function read_stolen_input(uid: number) : INPUTS
+/** 
+Clears a callback that is specific to a screen.
+ */
 declare function clear_screen_callback(screen_id: number, cb_id: CallbackId) : void
+/** 
+Returns unique id for the callback to be used in [clear_screen_callback](#clear_screen_callback) or `nil` if screen_id is not valid.
+Sets a callback that is called right before the screen is drawn, return `true` to skip the default rendering.
+ */
 declare function set_pre_render_screen(screen_id: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_screen_callback](#clear_screen_callback) or `nil` if screen_id is not valid.
+Sets a callback that is called right after the screen is drawn.
+ */
 declare function set_post_render_screen(screen_id: number, fun: Callback) : CallbackId | undefined
+/** 
+Clears a callback that is specific to an entity.
+ */
 declare function clear_entity_callback(uid: number, cb_id: CallbackId) : void
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+`uid` has to be the uid of a `Movable` or else stuff will break.
+Sets a callback that is called right before the statemachine, return `true` to skip the statemachine update.
+Use this only when no other approach works, this call can be expensive if overused.
+Check [here](virtual-availability.md) to see whether you can use this callback on the entity type you intend to.
+ */
 declare function set_pre_statemachine(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+`uid` has to be the uid of a `Movable` or else stuff will break.
+Sets a callback that is called right after the statemachine, so you can override any values the satemachine might have set (e.g. `animation_frame`).
+Use this only when no other approach works, this call can be expensive if overused.
+Check [here](virtual-availability.md) to see whether you can use this callback on the entity type you intend to.
+ */
 declare function set_post_statemachine(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right when an entity is destroyed, e.g. as if by `Entity.destroy()` before the game applies any side effects.
+The callback signature is `nil on_destroy(Entity self)`
+Use this only when no other approach works, this call can be expensive if overused.
+ */
 declare function set_on_destroy(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right when an entity is eradicated (killing monsters that leave a body behind will not trigger this), before the game applies any side effects.
+The callback signature is `nil on_kill(Entity self, Entity killer)`
+Use this only when no other approach works, this call can be expensive if overused.
+ */
 declare function set_on_kill(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right when an player/hired hand is crushed/insta-gibbed, return `true` to skip the game's crush handling.
+The callback signature is `bool on_player_instagib(Entity self)`
+The game's instagib function will be forcibly executed (regardless of whatever you return in the callback) when the entity's health is zero.
+This is so that when the entity dies (from other causes), the death screen still gets shown.
+Use this only when no other approach works, this call can be expensive if overused.
+ */
 declare function set_on_player_instagib(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right before an entity is damaged, return `true` to skip the game's damage handling.
+The callback signature is `bool on_damage(Entity self, Entity damage_dealer, int damage_amount, float velocity_x, float velocity_y, int stun_amount, int iframes)`
+Note that damage_dealer can be nil ! (long fall, ...)
+DO NOT CALL `self:damage()` in the callback !
+Use this only when no other approach works, this call can be expensive if overused.
+Check [here](virtual-availability.md) to see whether you can use this callback on the entity type you intend to.
+ */
 declare function set_on_damage(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right when a container is opened via up+door, or weapon is shot.
+The callback signature is `nil on_open(Entity entity_self, Entity opener)`
+Use this only when no other approach works, this call can be expensive if overused.
+Check [here](virtual-availability.md) to see whether you can use this callback on the entity type you intend to.
+ */
 declare function set_on_open(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right before the collision 1 event, return `true` to skip the game's collision handling.
+Use this only when no other approach works, this call can be expensive if overused.
+Check [here](virtual-availability.md) to see whether you can use this callback on the entity type you intend to.
+ */
 declare function set_pre_collision1(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Returns unique id for the callback to be used in [clear_entity_callback](#clear_entity_callback) or `nil` if uid is not valid.
+Sets a callback that is called right before the collision 2 event, return `true` to skip the game's collision handling.
+Use this only when no other approach works, this call can be expensive if overused.
+Check [here](virtual-availability.md) to see whether you can use this callback on the entity type you intend to.
+ */
 declare function set_pre_collision2(uid: number, fun: Callback) : CallbackId | undefined
+/** 
+Raise a signal and probably crash the game
+ */
 declare function raise() : void
+/** 
+Convert the hash to stringid
+Check [strings00_hashed.str](game_data/strings00_hashed.str) for the hash values, or extract assets with modlunky and check those.
+ */
 declare function hash_to_stringid(hash: number) : STRINGID
+/** 
+Get string behind STRINGID (don't use stringid diretcly for vanilla string, use `hash_to_stringid` first)
+Will return the string of currently choosen language
+ */
 declare function get_string(string_id: STRINGID) : string
+/** 
+Change string at the given id (don't use stringid diretcly for vanilla string, use `hash_to_stringid` first)
+This edits custom string and in game strings but changing the language in settings will reset game strings
+ */
 declare function change_string(string_id: STRINGID, str: string) : void
+/** 
+Add custom string, currently can only be used for names of shop items (Entitydb->description)
+Returns STRINGID of the new string
+ */
 declare function add_string(str: string) : STRINGID
+/** 
+Adds custom name to the item by uid used in the shops
+This is better alternative to `add_string` but instead of changing the name for entity type, it changes it for this particular entity
+ */
 declare function add_custom_name(uid: number, name: string) : void
+/** 
+Clears the name set with `add_custom_name`
+ */
 declare function clear_custom_name(uid: number) : void
+/** 
+Calls the enter door function, position doesn't matter, can also enter closed doors (like COG, EW) without unlocking them
+Doesn't really work for layer doors
+ */
 declare function enter_door(player_uid: number, door_uid: number) : void
+/** 
+Change ENT_TYPE's spawned by `FLOOR_SUNCHALLENGE_GENERATOR`, by default there are 4:
+{MONS_WITCHDOCTOR, MONS_VAMPIRE, MONS_SORCERESS, MONS_NECROMANCER}
+Because of the game logic number of entity types has to be a power of 2: (1, 2, 4, 8, 16, 32), if you want say 30 types, you need to write two entities two times (they will have higher "spawn chance")
+Use empty table as argument to reset to the game default
+ */
 declare function change_sunchallenge_spawns(ent_types: Array<ENT_TYPE>) : void
+/** 
+Change ENT_TYPE's spawned in dice shops (Madame Tusk as well), by default there are 25:
+{ITEM_PICKUP_BOMBBAG, ITEM_PICKUP_BOMBBOX, ITEM_PICKUP_ROPEPILE, ITEM_PICKUP_COMPASS, ITEM_PICKUP_PASTE, ITEM_PICKUP_PARACHUTE, ITEM_PURCHASABLE_CAPE, ITEM_PICKUP_SPECTACLES, ITEM_PICKUP_CLIMBINGGLOVES, ITEM_PICKUP_PITCHERSMITT,
+ENT_TYPE_ITEM_PICKUP_SPIKESHOES, ENT_TYPE_ITEM_PICKUP_SPRINGSHOES, ITEM_MACHETE, ITEM_BOOMERANG, ITEM_CROSSBOW, ITEM_SHOTGUN, ITEM_FREEZERAY, ITEM_WEBGUN, ITEM_CAMERA, ITEM_MATTOCK, ITEM_PURCHASABLE_JETPACK, ITEM_PURCHASABLE_HOVERPACK,
+ITEM_TELEPORTER, ITEM_PURCHASABLE_TELEPORTER_BACKPACK, ITEM_PURCHASABLE_POWERPACK}
+Min 6, Max 255, if you want less then 6 you need to write some of them more then once (they will have higher "spawn chance")
+If you use this function in the level with diceshop in it, you have to update `item_ids` in the [ITEM_DICE_PRIZE_DISPENSER](#PrizeDispenser)
+Use empty table as argument to reset to the game default
+ */
 declare function change_diceshop_prizes(ent_types: Array<ENT_TYPE>) : void
+/** 
+Change ENT_TYPE's spawned when you damage the altar, by default there are 6:
+{MONS_BAT, MONS_BEE, MONS_SPIDER, MONS_JIANGSHI, MONS_FEMALE_JIANGSHI, MONS_VAMPIRE}
+Max 255 types
+Use empty table as argument to reset to the game default
+ */
 declare function change_altar_damage_spawns(ent_types: Array<ENT_TYPE>) : void
+/** 
+Change ENT_TYPE's spawned when Waddler dies, by default there are 3:
+{ITEM_PICKUP_COMPASS, ITEM_CHEST, ITEM_KEY}
+Max 255 types
+Use empty table as argument to reset to the game default
+ */
 declare function change_waddler_drop(ent_types: Array<ENT_TYPE>) : void
+/** 
+Poisons entity, to cure poison set `poison_tick_timer` to -1
+ */
 declare function poison_entity(entity_uid: number) : void
+/** 
+Change how much health the ankh gives you after death, with every beat (the heart beat effect) it will add `beat_add_health` to your health,
+`beat_add_health` has to be divisor of `health` and can't be 0, otherwise the function does nothing, Set `health` to 0 return to game default values,
+If you set `health` above the game max health it will be forced down to the game max
+ */
 declare function modify_ankh_health_gain(max_health: number, beat_add_health: number) : void
+/** 
+Creates a new Illumination. Don't forget to continuously call `refresh_illumination`, otherwise your light emitter fades out! Check out the illumination.lua script for an example
+ */
 declare function create_illumination(color: Color, size: number, x: number, y: number) : Illumination
+/** 
+Creates a new Illumination. Don't forget to continuously call `refresh_illumination`, otherwise your light emitter fades out! Check out the illumination.lua script for an example
+ */
 declare function create_illumination(color: Color, size: number, uid: number) : Illumination
+/** 
+Refreshes an Illumination, keeps it from fading out
+ */
 declare function refresh_illumination(illumination: Illumination) : void
 declare function toast_visible() : boolean
 declare function speechbubble_visible() : boolean
 declare function cancel_toast() : void
 declare function cancel_speechbubble() : void
+/** 
+Seed the game prng.
+ */
 declare function seed_prng(seed: number) : void
+/** 
+Same as `Player.get_name`
+ */
 declare function get_character_name(type_id: ENT_TYPE) : string
+/** 
+Same as `Player.get_short_name`
+ */
 declare function get_character_short_name(type_id: ENT_TYPE) : string
+/** 
+Same as `Player.get_heart_color`
+ */
 declare function get_character_heart_color(type_id: ENT_TYPE) : Color
+/** 
+Same as `Player.is_female`
+ */
 declare function is_character_female(type_id: ENT_TYPE) : boolean
+/** 
+Same as `Player.set_heart_color`
+ */
 declare function set_character_heart_color(type_id: ENT_TYPE, color: Color) : void
+/** 
+Get the [ParticleDB](#particledb) details of the specified ID
+ */
 declare function get_particle_type(id: number) : ParticleDB
+/** 
+Generate particles of the specified type around the specified entity uid (use e.g. `local emitter = generate_world_particles(PARTICLEEMITTER.PETTING_PET, players[1].uid)`). You can then decouple the emitter from the entity with `emitter.entity_uid = -1` and freely move it around. See the `particles.lua` example script for more details.
+ */
 declare function generate_world_particles(particle_emitter_id: number, uid: number) : ParticleEmitterInfo
+/** 
+Generate particles of the specified type at a certain screen coordinate (use e.g. `local emitter = generate_screen_particles(PARTICLEEMITTER.CHARSELECTOR_TORCHFLAME_FLAMES, 0.0, 0.0)`). See the `particles.lua` example script for more details.
+ */
 declare function generate_screen_particles(particle_emitter_id: number, x: number, y: number) : ParticleEmitterInfo
+/** 
+Advances the state of the screen particle emitter (simulates the next positions, ... of all the particles in the emitter). Only used with screen particle emitters. See the `particles.lua` example script for more details.
+ */
 declare function advance_screen_particles(particle_emitter: ParticleEmitterInfo) : void
+/** 
+Renders the particles to the screen. Only used with screen particle emitters. See the `particles.lua` example script for more details.
+ */
 declare function render_screen_particles(particle_emitter: ParticleEmitterInfo) : void
+/** 
+Extinguish a particle emitter (use the return value of `generate_world_particles` or `generate_screen_particles` as the parameter in this function)
+ */
 declare function extinguish_particles(particle_emitter: ParticleEmitterInfo) : void
+/** 
+Default function in spawn definitions to check whether a spawn is valid or not
+ */
 declare function default_spawn_is_valid(x: number, y: number, layer: number) : boolean
+/** 
+Add a callback for a specific tile code that is called before the game handles the tile code.
+The callback signature is `bool pre_tile_code(x, y, layer, room_template)`
+Return true in order to stop the game or scripts loaded after this script from handling this tile code.
+For example, when returning true in this callback set for `"floor"` then no floor will spawn in the game (unless you spawn it yourself)
+ */
 declare function set_pre_tile_code_callback(cb: Callback, tile_code: string) : CallbackId
+/** 
+Add a callback for a specific tile code that is called after the game handles the tile code.
+The callback signature is `nil post_tile_code(x, y, layer, room_template)`
+Use this to affect what the game or other scripts spawned in this position.
+This is received even if a previous pre-tile-code-callback has returned true
+ */
 declare function set_post_tile_code_callback(cb: Callback, tile_code: string) : CallbackId
+/** 
+Define a new tile code, to make this tile code do anything you have to use either `set_pre_tile_code_callback` or `set_post_tile_code_callback`.
+If a user disables your script but still uses your level mod nothing will be spawned in place of your tile code.
+ */
 declare function define_tile_code(tile_code: string) : TILE_CODE
+/** 
+Gets a short tile code based on definition, returns `nil` if it can't be found
+ */
 declare function get_short_tile_code(short_tile_code_def: ShortTileCodeDef) : number | undefined
+/** 
+Gets the definition of a short tile code (if available), will vary depending on which file is loaded
+ */
 declare function get_short_tile_code_definition(short_tile_code: SHORT_TILE_CODE) : ShortTileCodeDef | undefined
+/** 
+Define a new procedural spawn, the function `nil do_spawn(x, y, layer)` contains your code to spawn the thing, whatever it is.
+The function `bool is_valid(x, y, layer)` determines whether the spawn is legal in the given position and layer.
+Use for example when you can spawn only on the ceiling, under water or inside a shop.
+Set `is_valid` to `nil` in order to use the default rule (aka. on top of floor and not obstructed).
+If a user disables your script but still uses your level mod nothing will be spawned in place of your procedural spawn.
+ */
 declare function define_procedural_spawn(procedural_spawn: string, do_spawn: Callback, is_valid: Callback) : PROCEDURAL_CHANCE
+/** 
+Define a new extra spawn, these are semi-guaranteed level gen spawns with a fixed upper bound.
+The function `nil do_spawn(x, y, layer)` contains your code to spawn the thing, whatever it is.
+The function `bool is_valid(x, y, layer)` determines whether the spawn is legal in the given position and layer.
+Use for example when you can spawn only on the ceiling, under water or inside a shop.
+Set `is_valid` to `nil` in order to use the default rule (aka. on top of floor and not obstructed).
+To change the number of spawns use `PostRoomGenerationContext::set_num_extra_spawns` during `ON.POST_ROOM_GENERATION`
+No name is attached to the extra spawn since it is not modified from level files, instead every call to this function will return a new uniqe id.
+ */
 declare function define_extra_spawn(do_spawn: Callback, is_valid: Callback, num_spawns_frontlayer: number, num_spawns_backlayer: number) : number
-declare function get_missing_extra_spawns(extra_spawn_chance_id: number) : [number, number]
-declare function get_room_index(x: number, y: number) : [number, number]
-declare function get_room_pos(x: number, y: number) : [number, number]
+/** 
+Use to query whether any of the requested spawns could not be made, usually because there were not enough valid spaces in the level.
+Returns missing spawns in the front layer and missing spawns in the back layer in that order.
+The value only makes sense after level generation is complete, aka after `ON.POST_LEVEL_GENERATION` has run.
+ */
+declare function get_missing_extra_spawns(extra_spawn_chance_id: number) : LuaMultiReturn<[number, number]>
+/** 
+Transform a position to a room index to be used in `get_room_template` and `PostRoomGenerationContext.set_room_template`
+ */
+declare function get_room_index(x: number, y: number) : LuaMultiReturn<[number, number]>
+/** 
+Transform a room index into the top left corner position in the room
+ */
+declare function get_room_pos(x: number, y: number) : LuaMultiReturn<[number, number]>
+/** 
+Get the room template given a certain index, returns `nil` if coordinates are out of bounds
+ */
 declare function get_room_template(x: number, y: number, layer: LAYER) : number | undefined
+/** 
+Get whether a room is flipped at the given index, returns `false` if coordinates are out of bounds
+ */
 declare function is_room_flipped(x: number, y: number) : boolean
+/** 
+For debugging only, get the name of a room template, returns `'invalid'` if room template is not defined
+ */
 declare function get_room_template_name(room_template: number) : string
+/** 
+Define a new room remplate to use with `set_room_template`
+ */
 declare function define_room_template(room_template: string, type: ROOM_TEMPLATE_TYPE) : number
+/** 
+Set the size of room template in tiles, the template must be of type `ROOM_TEMPLATE_TYPE.MACHINE_ROOM`.
+ */
 declare function set_room_template_size(room_template: number, width: number, height: number) : boolean
+/** 
+Get the inverse chance of a procedural spawn for the current level.
+A return value of 0 does not mean the chance is infinite, it means the chance is zero.
+ */
 declare function get_procedural_spawn_chance(chance_id: PROCEDURAL_CHANCE) : number
+/** 
+Gets the sub theme of the current cosmic ocean level, returns `COSUBTHEME.NONE` if the current level is not a CO level.
+ */
 declare function get_co_subtheme() : number
+/** 
+Forces the theme of the next cosmic ocean level(s) (use e.g. `force_co_subtheme(COSUBTHEME.JUNGLE)`. Use `COSUBTHEME.RESET` to reset to default random behaviour)
+ */
 declare function force_co_subtheme(subtheme: number) : void
+/** 
+Gets the value for the specified config
+ */
 declare function get_level_config(config: LEVEL_CONFIG) : number
+/** 
+Loads a sound from disk relative to this script, ownership might be shared with other code that loads the same file. Returns nil if file can't be found
+ */
 declare function create_sound(path: string) : CustomSound | undefined
+/** 
+Gets an existing sound, either if a file at the same path was already loaded or if it is already loaded by the game
+ */
 declare function get_sound(path_or_vanilla_sound: string) : CustomSound | undefined
+/** 
+Returns unique id for the callback to be used in [clear_vanilla_sound_callback](#clear_vanilla_sound_callback).
+Sets a callback for a vanilla sound which lets you hook creation or playing events of that sound
+Callbacks are executed on another thread, so avoid touching any global state, only the local Lua state is protected
+If you set such a callback and then play the same sound yourself you have to wait until receiving the STARTED event before changing any
+properties on the sound. Otherwise you may cause a deadlock. The callback signature is `nil on_vanilla_sound(PlayingSound sound)`
+ */
 declare function set_vanilla_sound_callback(name: VANILLA_SOUND, types: VANILLA_SOUND_CALLBACK_TYPE, cb: Callback) : CallbackId
+/** 
+Clears a previously set callback
+ */
 declare function clear_vanilla_sound_callback(id: CallbackId) : void
+/** 
+Converts a color to int to be used in drawing functions. Use values from `0..255`.
+ */
 declare function rgba(r: number, g: number, b: number, a: number) : uColor
-declare function draw_text_size(size: number, text: string) : [number, number]
-declare function create_image(path: string) : [IMAGE, number, number]
-declare function mouse_position() : [number, number]
-declare function get_io() : void
-declare function set_drop_chance(dropchance_id: number, new_drop_chance: number) : void
-declare function replace_drop(drop_id: number, new_drop_entity_type: ENT_TYPE) : void
-declare function get_texture_definition(texture_id: TEXTURE) : TextureDefinition
-declare function define_texture(texture_data: TextureDefinition) : TEXTURE
-declare function reload_texture(texture_path: string) : void
-declare function get_hitbox(uid: number, extrude: number | undefined, offsetx: number | undefined, offsety: number | undefined) : AABB
-declare function get_render_hitbox(uid: number, extrude: number | undefined, offsetx: number | undefined, offsety: number | undefined) : AABB
-declare function screen_aabb(box: AABB) : AABB
-declare function udp_listen(host: string, port: in_port_t, cb: Callback) : UdpServer
-declare function udp_send(host: string, port: in_port_t, msg: string) : void
-//## Types
-//Using the api through these directly is kinda dangerous, but such is life. I got pretty bored writing this doc generator at this point, so you can find the variable types in the [source files](https://github.com/spelunky-fyi/overlunky/tree/main/src/game_api). They're mostly just ints and floats. Example:
-/*```lua
--- This doesn't make any sense, as you could just access the variables directly from players[]
--- It's just a weird example OK!
-ids = get_entities_by_mask(MASK.PLAYER) -- This just covers CHARs
-for i,id in ipairs(ids) do
-    e = get_entity(id)     -- casts Entity to Player automatically
-    e.health = 99          -- setting Player::health
-    e.inventory.bombs = 99 -- setting Inventory::bombs
-    e.inventory.ropes = 99 -- setting Inventory::ropes
-    e.type.jump = 0.36     -- setting EntityDB::jump
+/** 
+Calculate the bounding box of text, so you can center it etc. Returns `width`, `height` in screen distance.
+Example:
+```lua
+function on_guiframe(draw_ctx)
+    -- get a random color
+    color = math.random(0, 0xffffffff)
+    -- zoom the font size based on frame
+    size = (get_frame() % 199)+1
+    text = 'Awesome!'
+    -- calculate size of text
+    w, h = draw_text_size(size, text)
+    -- draw to the center of screen
+    draw_ctx:draw_text(0-w/2, 0-h/2, size, text, color)
 end
-```*/
+```
+ */
+declare function draw_text_size(size: number, text: string) : LuaMultiReturn<[number, number]>
+/** 
+Create image from file. Returns a tuple containing id, width and height.
+ */
+declare function create_image(path: string) : LuaMultiReturn<[IMAGE, number, number]>
+/** 
+Current mouse cursor position in screen coordinates.
+ */
+declare function mouse_position() : LuaMultiReturn<[number, number]>
+/** 
+Returns: [ImGuiIO](#imguiio) for raw keyboard, mouse and xinput gamepad stuff. This is kinda bare and might change.
+- Note: The clicked/pressed actions only make sense in `ON.GUIFRAME`.
+- Note: Lua starts indexing at 1, you need `keysdown[string.byte('A') + 1]` to find the A key.
+- Note: Overlunky/etc will eat all keys it is currently configured to use, your script will only get leftovers.
+- Note: `gamepad` is basically [XINPUT_GAMEPAD](https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_gamepad) but variables are renamed and values are normalized to -1.0..1.0 range.
+ */
+declare function get_io() : void
+/** 
+Alters the drop chance for the provided monster-item combination (use e.g. set_drop_chance(DROPCHANCE.MOLE_MATTOCK, 10) for a 1 in 10 chance)
+Use `-1` as dropchance_id to reset all to default
+ */
+declare function set_drop_chance(dropchance_id: number, new_drop_chance: number) : void
+/** 
+Changes a particular drop, e.g. what Van Horsing throws at you (use e.g. replace_drop(DROP.VAN_HORSING_DIAMOND, ENT_TYPE.ITEM_PLASMACANNON))
+Use `0` as type to reset this drop to default, use `-1` as drop_id to reset all to default
+ */
+declare function replace_drop(drop_id: number, new_drop_entity_type: ENT_TYPE) : void
+/** 
+Gets a `TextureDefinition` for equivalent to the one used to define the texture with `id`
+ */
+declare function get_texture_definition(texture_id: TEXTURE) : TextureDefinition
+/** 
+Defines a new texture that can be used in Entity::set_texture
+If a texture with the same definition already exists the texture will be reloaded from disk.
+ */
+declare function define_texture(texture_data: TextureDefinition) : TEXTURE
+/** 
+Reloads a texture from disk, use this only as a development tool for example in the console
+Note that `define_texture` will also reload the texture if it already exists
+ */
+declare function reload_texture(texture_path: string) : void
+/** 
+Gets the hitbox of an entity, use `extrude` to make the hitbox bigger/smaller in all directions and `offset` to offset the hitbox in a given direction
+ */
+declare function get_hitbox(uid: number, extrude: number | undefined, offsetx: number | undefined, offsety: number | undefined) : AABB
+/** 
+Same as `get_hitbox` but based on `get_render_position`
+ */
+declare function get_render_hitbox(uid: number, extrude: number | undefined, offsetx: number | undefined, offsety: number | undefined) : AABB
+/** 
+Convert an `AABB` to a screen `AABB` that can be directly passed to draw functions
+ */
+declare function screen_aabb(box: AABB) : AABB
+/** 
+Start an UDP server on specified address and run callback when data arrives. Return a string from the callback to reply. Requires unsafe mode.
+ */
+declare function udp_listen(host: string, port: in_port_t, cb: Callback) : UdpServer
+/** 
+Send data to specified UDP address. Requires unsafe mode.
+ */
+declare function udp_send(host: string, port: in_port_t, msg: string) : void
+
+//## Types
+
 declare class SaveContext {
     save(data: string): boolean
 }
@@ -363,6 +1189,9 @@ declare class ArenaState {
     player_lives: Array<number>
     player_totalwins: Array<number>
     player_won: Array<boolean>
+/** 
+The menu selection for timer, default values 0..20 where 0 == 30 seconds, 19 == 10 minutes and 20 == infinite. Can go higher, although this will glitch the menu text. Actual time (seconds) = (state.arena.timer + 1) x 30
+ */
     timer: number
     timer_ending: number
     wins: number
@@ -395,6 +1224,9 @@ declare class SelectPlayerSlot {
 declare class Items {
     player_count: number
     saved_pets_count: number
+/** 
+Pet information for level transition
+ */
     saved_pets: Array<ENT_TYPE>
     is_pet_cursed: Array<boolean>
     is_pet_poisoned: Array<boolean>
@@ -412,7 +1244,13 @@ declare class StateMemory {
     height: number
     kali_favor: number
     kali_status: number
+/** 
+Also affects if the player has punish ball, if the punish ball is destroyed it is set to -1
+ */
     kali_altars_destroyed: number
+/** 
+0 - none, 1 - item, 3 - kapala
+ */
     kali_gifts: number
     seed: number
     time_total: number
@@ -425,12 +1263,18 @@ declare class StateMemory {
     theme: number
     theme_next: number
     theme_start: number
+/** 
+This Callback should only be used in a very specific circumstance (forcing the exiting theme when manually transitioning). Will crash the game if used inappropriately!
+ */
     force_current_theme(t: number): void
     shoppie_aggro: number
     shoppie_aggro_next: number
     merchant_aggro: number
     kills_npc: number
     level_count: number
+/** 
+Total amount of damage taken, excluding cause of death
+ */
     damage_taken: number
     journal_flags: number
     time_last_level: number
@@ -443,9 +1287,15 @@ declare class StateMemory {
     fadeout: number
     fadein: number
     loading_black_screen_timer: number
+/** 
+Run totals
+ */
     saved_dogs: number
     saved_cats: number
     saved_hamsters: number
+/** 
+0 = no win 1 = tiamat win 2 = hundun win 3 = CO win; set this and next doorway leads to victory scene
+ */
     win_state: number
     illumination: Illumination
     money_last_levels: number
@@ -478,11 +1328,17 @@ declare class StateMemory {
     screen_arena_score: ScreenArenaScore
     screen_arena_menu: ScreenArenaMenu
     screen_arena_items: ScreenArenaItems
+/** 
+Returns animation_frame of the correct ushabti
+ */
     get_correct_ushabti(): number
     set_correct_ushabti(animation_frame: number): void
     arena: ArenaState
     speedrun_character: ENT_TYPE
     speedrun_activation_trigger: number
+/** 
+Who pops out the spaceship for a tiamat/hundun win, this is set upon the spaceship door open
+ */
     end_spaceship_character: ENT_TYPE
     world2_coffin_spawned: boolean
     world4_coffin_spawned: boolean
@@ -539,10 +1395,16 @@ declare class LightParams {
     size: number
 }
 declare class Illumination {
+/** 
+Table of light1, light2, ... etc.
+ */
     lights: Array<LightParams>
     light1: LightParams
     light2: LightParams
     light3: LightParams
+/** 
+It's rendered on objects around, not as an actual bright spot
+ */
     light4: LightParams
     brightness: number
     brightness_multiplier: number
@@ -552,7 +1414,14 @@ declare class Illumination {
     offset_y: number
     distortion: number
     entity_uid: number
+/** 
+see [flags.hpp](../src/game_api/flags.hpp) illumination_flags
+ */
     flags: number
+/** 
+Only one can be set: 1 - Follow camera, 2 - Follow Entity, 3 - Rectangle, full brightness
+Rectangle always uses light1, even when it's disabled in flags
+ */
     type_flags: number
     enabled: boolean
     layer: number
@@ -590,6 +1459,9 @@ declare class OnlinePlayer {
 }
 declare class OnlineLobby {
     code: number
+/** 
+Gets the string equivalent of the code
+ */
     get_code(): string
 }
 declare class LogicList {
@@ -626,21 +1498,45 @@ declare class LogicDiceShop extends Logic {
     balance: number
 }
 declare class PRNG {
+/** 
+Same as `seed_prng`
+ */
     seed(seed: number): void
     random_float: void
+/** 
+Returns true with a chance of `1/inverse_chance`
+ */
     random_chance(inverse_chance: number, type: PRNG_CLASS): boolean
+/** 
+Generate a numbereger number in the range `[1, i]` or `nil` if `i < 1`
+ */
     random_index(i: number, type: PRNG_CLASS): number | undefined
     random_int: number | undefined
+/** 
+Drop-in replacement for `math.random()`
+ */
     random(): number
+/** 
+Drop-in replacement for `math.random(i)`
+ */
     random(i: number): number | undefined
+/** 
+Drop-in replacement for `math.random(min, max)`
+ */
     random(min: number, max: number): number | undefined
     get_pair: number | undefined
     set_pair: number | undefined
 }
 declare class Color {
-    constructor()
-    constructor(Color: Color)
-    constructor(r_: number, g_: number, b_: number, a_: number)
+/** 
+Create a new color - defaults to black
+ */
+    static new(): Color
+    static new(Color: Color): Color
+/** 
+Create a new color by specifying its values
+ */
+    static new(r_: number, g_: number, b_: number, a_: number): Color
     r: number
     g: number
     b: number
@@ -661,9 +1557,21 @@ declare class Color {
     static navy(): Color
     static fuchsia(): Color
     static purple(): Color
-    get_rgba(): [number, number, number, number]
+/** 
+Returns RGBA colors in 0..255 range
+ */
+    get_rgba(): LuaMultiReturn<[number, number, number, number]>
+/** 
+Changes color based on given RGBA colors in 0..255 range
+ */
     set_rgba(red: number, green: number, blue: number, alpha: number): void
+/** 
+Returns the `uColor` used in `GuiDrawContext` drawing Callbacks
+ */
     get_ucolor(): uColor
+/** 
+Changes color based on given uColor
+ */
     set_ucolor(color: uColor): void
 }
 declare class Animation {
@@ -713,6 +1621,9 @@ declare class Entity {
     more_flags: number
     uid: number
     animation_frame: number
+/** 
+Don't edit this dirrectly, use `set_draw_depth`
+ */
     draw_depth: number
     x: number
     y: number
@@ -732,19 +1643,47 @@ declare class Entity {
     topmost(): Entity
     topmost_mount(): Entity
     overlaps_with(hitbox: AABB): boolean
+/** 
+Deprecated
+Use `overlaps_with(AABB hitbox)` instead
+ */
     overlaps_with(rect_left: number, rect_bottom: number, rect_right: number, rect_top: number): boolean
     overlaps_with(other: Entity): boolean
     get_texture(): TEXTURE
+/** 
+Changes the entity texture, check the [textures.txt](game_data/textures.txt) for available vanilla textures or use [define_texture](#define_texture) to make custom one
+ */
     set_texture(texture_id: TEXTURE): boolean
     set_draw_depth(draw_depth: number): void
     liberate_from_shop(): void
     get_held_entity(): Entity
+/** 
+Moves the entity to specified layer, nothing else happens, so this does not emulate a door transition
+ */
     set_layer(layer: LAYER): void
+/** 
+Moves the entity to the limbo-layer where it can later be retrieved from again via `respawn`
+ */
     remove(): void
+/** 
+Moves the entity from the limbo-layer (where it was previously put by `remove`) to `layer`
+ */
     respawn(layer: LAYER): void
+/** 
+Completely removes the entity from existence
+ */
     destroy(): void
+/** 
+Activates a button prompt (with the Use door/Buy button), e.g. buy shop item, activate drill, read sign, numbereract in camp, ... `get_entity(<udjat socket uid>):activate(players[1])` (make sure player 1 has the udjat eye though)
+ */
     activate(activator: Entity): void
+/** 
+Performs a teleport as if the entity had a teleporter and used it. The delta coordinates are where you want the entity to teleport to relative to its current position, in tiles (so numberegers, not numbers). Positive numbers = to the right and up, negative left and down.
+ */
     perform_teleport(delta_x: number, delta_y: number): void
+/** 
+Triggers weapons and other held items like teleportter, mattock etc. You can check the [virtual-availability.md](virtual-availability.md), if entity has `open` in the `on_open` you can use this Callback, otherwise it does nothing. Returns false if action could not be performed (cooldown is not 0, no arrow loaded in etc. the animation could still be played thou)
+ */
     trigger_action(user: Entity): boolean
     get_metadata: boolean
     apply_metadata(metadata: number): void
@@ -769,14 +1708,25 @@ declare class Movable extends Entity {
     health: number
     stun_timer: number
     stun_state: number
+/** 
+Related to taking damage, also drops you from ladder/rope, can't be set while on the ground unless you'r on a mount
+ */
     lock_input_timer: number
+/** 
+Deprecated, it's the same as lock_input_timer, but this name makes no sense
+ */
     some_state: number
     wet_effect_timer: number
     poison_tick_timer: number
+/** 
+airtime = falling_timer
+ */
     airtime: number
+/** 
+airtime = falling_timer
+ */
     falling_timer: number
     is_poisoned: (() => {}) | boolean
-    //is_poisoned(): boolean
     poison(frames: number): void
     dark_shadow_timer: number
     onfire_effect_timer: number
@@ -792,57 +1742,178 @@ declare class Movable extends Entity {
     light_on_fire(): void
     set_cursed(b: boolean): void
     drop: ((entity_to_drop: Entity) => {}) | boolean
-    //drop(entity_to_drop: Entity): void
     pick_up(entity_to_pick_up: Entity): void
     can_jump(): boolean
     standing_on(): Entity
+/** 
+Adds or subtracts the specified amount of money to the movable's (player's) inventory. Shows the calculation animation in the HUD.
+ */
     add_money(money: number): void
+/** 
+Damage the movable by the specified amount, stuns and gives it invincibility for the specified amount of frames and applies the velocities
+ */
     damage(damage_dealer_uid: number, damage_amount: number, stun_time: number, velocity_x: number, velocity_y: number, iframes: number): void
 }
 declare class PowerupCapable extends Movable {
+/** 
+Removes a currently applied powerup. Specify `ENT_TYPE.ITEM_POWERUP_xxx`, not `ENT_TYPE.ITEM_PICKUP_xxx`! Removing the Eggplant crown does not seem to undo the throwing of eggplants, the other powerups seem to work.
+ */
     remove_powerup(powerup_type: ENT_TYPE): void
+/** 
+Gives the player/monster the specified powerup. Specify `ENT_TYPE.ITEM_POWERUP_xxx`, not `ENT_TYPE.ITEM_PICKUP_xxx`! Giving true crown to a monster crashes the game.
+ */
     give_powerup(powerup_type: ENT_TYPE): void
+/** 
+Checks whether the player/monster has a certain powerup
+ */
     has_powerup(powerup_type: ENT_TYPE): boolean
+/** 
+Return all powerups that the entity has
+ */
     get_powerups(): Array<ENT_TYPE>
+/** 
+Unequips the currently worn backitem
+ */
     unequip_backitem(): void
+/** 
+Returns the uid of the currently worn backitem, or -1 if wearing nothing
+ */
     worn_backitem(): number
 }
 declare class Inventory {
+/** 
+Sum of the money collected in current level
+ */
     money: number
     bombs: number
     ropes: number
     player_slot: number
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     poison_tick_timer: number
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     cursed: boolean
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     elixir_buff: boolean
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     health: number
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     kapala_blood_amount: number
+/** 
+Is set to state.time_total when player dies in coop (to determinate who should be first to re-spawn from coffin)
+ */
     time_of_death: number
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     held_item: ENT_TYPE
+/** 
+Metadata of the held item (health, is cursed etc.)
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     held_item_metadata: number
+/** 
+Used to transfer information to transition/next level (player rading a mout). Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     mount_type: ENT_TYPE
+/** 
+Metadata of the mount (health, is cursed etc.)
+Used to transfer information to transition/next level (player rading a mout). Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     mount_metadata: number
     kills_level: number
     kills_total: number
+/** 
+Total money collected during previous levels (not the current one)
+ */
     collected_money_total: number
+/** 
+Types of gold/gems collected during this level, used later to display during the transition
+ */
     collected_money: Array<ENT_TYPE>
+/** 
+Values of gold/gems collected during this level, used later to display during the transition
+ */
     collected_money_values: Array<number>
+/** 
+Types of enemies killed during this level, used later to display during the transition
+ */
     killed_enemies: Array<ENT_TYPE>
+/** 
+Number of companions, it will determinate how many companions will be transfered to next level
+Increments when player acquires new companion, decrements when one of them dies
+ */
     companion_count: number
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     companions: Array<ENT_TYPE>
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     companion_held_items: Array<ENT_TYPE>
+/** 
+Metadata of items held by companions (health, is cursed etc.)
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     companion_held_item_metadatas: Array<number>
+/** 
+(0..3) Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     companion_trust: Array<number>
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     companion_health: Array<number>
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     companion_poison_tick_timers: Array<number>
+/** 
+Used to transfer information to transition/next level. Is not updated during a level
+You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
+ */
     is_companion_cursed: Array<boolean>
 }
 declare class Ai {
     target: Entity
     target_uid: number
     timer: number
+/** 
+AI state (patrol, sleep, attack, aggro...)
+ */
     state: number
+/** 
+Levels completed with, 0..3
+ */
     trust: number
+/** 
+How many times master has violated us
+ */
     whipped: number
 }
 declare class Player extends PowerupCapable {
@@ -853,10 +1924,25 @@ declare class Player extends PowerupCapable {
     ai: Ai
     set_jetpack_fuel(fuel: number): void
     kapala_blood_amount(): number
+/** 
+Get the full name of the character, this will be the modded name not only the vanilla name.
+ */
     get_name(): string
+/** 
+Get the short name of the character, this will be the modded name not only the vanilla name.
+ */
     get_short_name(): string
+/** 
+Get the heart color of the character, this will be the modded heart color not only the vanilla heart color.
+ */
     get_heart_color(): Color
+/** 
+Check whether the character is female, will be `true` if the character was modded to be female as well.
+ */
     is_female(): boolean
+/** 
+Set the heart color the character.
+ */
     set_heart_color(hcolor: Color): void
 }
 declare class Floor extends Entity {
@@ -864,9 +1950,23 @@ declare class Floor extends Entity {
     deco_bottom: number
     deco_left: number
     deco_right: number
+/** 
+Sets `animation_frame` of the floor for types `FLOOR_BORDERTILE`, `FLOOR_BORDERTILE_METAL` and `FLOOR_BORDERTILE_OCTOPUS`.
+ */
     fix_border_tile_animation(): void
+/** 
+Used to add decoration to a floor entity after it was spawned outside of level gen, is not necessary when spawning during level gen.
+Set `fix_also_neighbours` to `true` to fix the neighbouring floor tile decorations on the border of the two tiles.
+Set `fix_styled_floor` to `true` to fix decorations on `FLOORSTYLED_` entities, those usually only have decorations when broken.
+ */
     fix_decorations(fix_also_neighbors: boolean, fix_styled_floor: boolean): void
+/** 
+Explicitly add a decoration on the given side. Corner decorations only exist for `FLOOR_BORDERTILE` and `FLOOR_BORDERTILE_OCTOPUS`.
+ */
     add_decoration(side: FLOOR_SIDE): void
+/** 
+Explicitly remove a decoration on the given side. Corner decorations only exist for `FLOOR_BORDERTILE` and `FLOOR_BORDERTILE_OCTOPUS`.
+ */
     remove_decoration(side: FLOOR_SIDE): void
     decorate_internal: void
 }
@@ -875,7 +1975,13 @@ declare class Door extends Floor {
     fx_button: Entity
 }
 declare class ExitDoor extends Door {
+/** 
+if true entering it does not load the transition
+ */
     entered: boolean
+/** 
+use provided world/level/theme
+ */
     special_door: boolean
     level: number
     timer: number
@@ -902,15 +2008,24 @@ declare class EggShipDoorS extends EggShipDoor {
 declare class Arrowtrap extends Floor {
     arrow_shot: boolean
     rearm(): void
+/** 
+The uid must be movable entity for ownership transfers
+ */
     trigger(who_uid: number): void
 }
 declare class TotemTrap extends Floor {
     spawn_entity_type: ENT_TYPE
     first_sound_id: number
+/** 
+The uid must be movable entity for ownership transfers
+ */
     trigger(who_uid: number, left: boolean): void
 }
 declare class LaserTrap extends Floor {
     emitted_light: Illumination
+/** 
+after triggering counts from 0 to 255, changes the 'phase_2' then counts from 0 to 104
+ */
     reset_timer: number
     phase_2: boolean
 }
@@ -919,12 +2034,21 @@ declare class SparkTrap extends Floor {
     spark_uid: number
 }
 declare class Altar extends Floor {
+/** 
+for normal altar: counts from 0 to 20 then 0, then 1 then 0 and sacrifice happens
+ */
     timer: number
 }
 declare class SpikeballTrap extends Floor {
     chain: Entity
     end_piece: Entity
+/** 
+0 - none, 1 - start, 2 - going_down, 3 - going_up, 4 - pause | going_up is only right when timer is 0, otherwise it just sits at the bottom
+ */
     state: number
+/** 
+for the start and retract
+ */
     timer: number
 }
 declare class TransferFloor extends Floor {
@@ -934,6 +2058,9 @@ declare class ConveyorBelt extends TransferFloor {
     timer: number
 }
 declare class Pipe extends Floor {
+/** 
+3 - straight_horizontal, 4 - blocked, 5 - down_left_turn, 6 - down_right_turn, 8 - blocked, 9 - up_left_turn, 10 - up_right_turn, 12 - straight_vertical
+ */
     direction_type: number
     end_pipe: boolean
 }
@@ -941,38 +2068,65 @@ declare class Generator extends Floor {
     spawned_uid: number
     set_timer: number
     timer: number
+/** 
+works only for star challenge
+ */
     start_counter: number
+/** 
+works only for star challenge
+ */
     on_off: boolean
 }
 declare class SlidingWallCeiling extends Floor {
     attached_piece: Entity
     active_floor_part_uid: number
+/** 
+1 - going up / is at the top, 2 - pause
+ */
     state: number
 }
 declare class QuickSand extends Floor {
 }
 declare class BigSpearTrap extends Floor {
     spear_uid: number
+/** 
+setting the left part to 0 or right part to 1 destroys the trap
+ */
     left_part: boolean
+/** 
+The uid must be movable entity for ownership transfers, has to be called on the left part of the trap,
+ */
     trigger(who_uid: number, left: boolean): void
 }
 declare class StickyTrap extends Floor {
     attached_piece_uid: number
     ball_uid: number
+/** 
+0 - none, 1 - start, 2 - going down, 3 - is at the bottom, 4 - going up, 5 - pause
+ */
     state: number
     timer: number
 }
 declare class MotherStatue extends Floor {
+/** 
+Table of player1_standing, player2_standing, ... etc.
+ */
     players_standing: Array<boolean>
     player1_standing: boolean
     player2_standing: boolean
     player3_standing: boolean
     player4_standing: boolean
+/** 
+Table of player1_health_received, player2_health_received, ... etc.
+ */
     players_health_received: Array<boolean>
     player1_health_received: boolean
     player2_health_received: boolean
     player3_health_received: boolean
     player4_health_received: boolean
+/** 
+Table of player1_health_timer, player2_health_timer, ... etc.
+ */
     players_health_timer: Array<number>
     player1_health_timer: number
     player2_health_timer: number
@@ -982,6 +2136,9 @@ declare class MotherStatue extends Floor {
     eggplantchild_detected: boolean
 }
 declare class TeleportingBorder extends Floor {
+/** 
+0 - right, 1 - left, 2 - bottom, 3 - top, 4 - disable
+ */
     direction: number
 }
 declare class ForceField extends Floor {
@@ -1004,6 +2161,9 @@ declare class HorizontalForceField extends Floor {
 declare class TentacleBottom extends Floor {
     attached_piece_uid: number
     tentacle_uid: number
+/** 
+0 - none, 1 - start, 2 - moving up, 3 - at the top, 4 - moving down 5 - pause
+ */
     state: number
 }
 declare class PoleDeco extends Floor {
@@ -1011,19 +2171,40 @@ declare class PoleDeco extends Floor {
     deco_down: number
 }
 declare class JungleSpearTrap extends Floor {
+/** 
+The uid must be movable entity for ownership transfers, direction: 1 = left, 2 = right, 3 = up, 4 = down
+ */
     trigger(who_uid: number, direction: number): void
 }
 declare class Crushtrap extends Movable {
     dirx: number
     diry: number
+/** 
+counts from 30 to 0 before moving, after it stops, counts from 60 to 0 before it can be triggered again
+ */
     timer: number
+/** 
+counts from 7 to 0 after it hits the wall and moves away until the timer hits 0, then moves back and counts from 255 until it hits the wall again, if needed it will start the counter again for another bounce
+ */
     bounce_back_timer: number
 }
 declare class Olmec extends Movable {
     target_uid: number
+/** 
+0 = stomp, 1 = bombs, 2 = stomp+ufos, 3 = in lava
+ */
     attack_phase: number
+/** 
+in phase 0/2: time spent looking for player, in phase 1: time between bomb salvo
+ */
     attack_timer: number
+/** 
+general timer that counts down whenever olmec is active
+ */
     ai_timer: number
+/** 
+-1 = left, 0 = down, 1 = right | phase 0/2: depends on target, phase 1: travel direction
+ */
     move_direction: number
     jump_timer: number
     phase1_amount_of_bomb_salvos: number
@@ -1036,6 +2217,9 @@ declare class WoodenlogTrap extends Movable {
     falling_speed: number
 }
 declare class Boulder extends Movable {
+/** 
+is set to 1 when the boulder first hits the ground
+ */
     is_rolling: number
 }
 declare class PushBlock extends Movable {
@@ -1051,7 +2235,13 @@ declare class LightArrowPlatform extends Movable {
     emitted_light: Illumination
 }
 declare class FallingPlatform extends Movable {
+/** 
+The name `emitted_light` is false here, don't use it, it should be called `timer`
+ */
     emitted_light: number
+/** 
+The name `emitted_light` is false here, don't use it, it should be called `timer`
+ */
     timer: number
     shaking_factor: number
     y_pos: number
@@ -1064,10 +2254,16 @@ declare class Drill extends Movable {
     trigger(): void
 }
 declare class ThinIce extends Movable {
+/** 
+counts down when standing on, maximum is 134 as based of this value it changes animation_frame, and above that value it changes to wrong sprite
+ */
     strength: number
 }
 declare class Elevator extends Movable {
     emitted_light: Illumination
+/** 
+puase timer, counts down 60 to 0
+ */
     timer: number
     moving_up: boolean
 }
@@ -1082,6 +2278,9 @@ declare class RegenBlock extends Movable {
     on_breaking: boolean
 }
 declare class TimedPowderkeg extends PushBlock {
+/** 
+timer till explosion, -1 = pause, counts down
+ */
     timer: number
 }
 declare class Mount extends Movable {
@@ -1118,23 +2317,44 @@ declare class RoomOwner extends Monster {
     ai_state: number
     patrol_timer: number
     lose_interest_timer: void
+/** 
+can't shot when the timer is running
+ */
     countdown_timer: number
     is_patrolling: boolean
+/** 
+setting this makes him angry, if it's shopkeeper you get 2 agrro ponumbers
+ */
     aggro_trigger: boolean
+/** 
+also is set true if you set aggro to true, get's trigger even when whiping
+ */
     was_hurt: boolean
 }
 declare class WalkingMonster extends Monster {
     chatting_to_uid: number
+/** 
+alternates between walking and pausing every time it reaches zero
+ */
     walk_pause_timer: number
+/** 
+used for chatting with other monsters, attack cooldowns etc.
+ */
     cooldown_timer: number
 }
 declare class NPC extends Monster {
     climb_direction: number
     target_in_sight_timer: number
     ai_state: number
+/** 
+for bodyguard and shopkeeperclone it spawns a weapon as well
+ */
     aggro: boolean
 }
 declare class Ghost extends Monster {
+/** 
+for SMALL_HAPPY this is also the sequence timer of its various states
+ */
     split_timer: number
     velocity_multiplier: number
     ghost_behaviour: GHOST_BEHAVIOR
@@ -1146,8 +2366,17 @@ declare class Bat extends Monster {
     spawn_y: number
 }
 declare class Jiangshi extends Monster {
+/** 
+wait time between jumps
+ */
     wait_timer: number
+/** 
+only female aka assassin: when 0 will jump up numbero ceiling
+ */
     jump_counter: number
+/** 
+only female aka assassin
+ */
     on_ceiling: boolean
 }
 declare class Monkey extends Monster {
@@ -1163,16 +2392,28 @@ declare class Mole extends Monster {
     burrowing_particle: ParticleEmitterInfo
     burrow_dir_x: number
     burrow_dir_y: number
+/** 
+stores the last uid as well
+ */
     burrowing_in_uid: number
     counter_burrowing: number
     counter_nonburrowing: number
     countdown_for_appearing: number
+/** 
+0 - non_burrowed, 1 - unknown, 2 - burrowed, 3 - state_change
+ */
     digging_state: number
 }
 declare class Spider extends Monster {
     ceiling_pos_x: number
     ceiling_pos_y: number
+/** 
+For the giant spider, some times he shot web instead of jumping
+ */
     jump_timer: number
+/** 
+only in the x coord
+ */
     trigger_distance: number
 }
 declare class HangSpider extends Monster {
@@ -1181,35 +2422,83 @@ declare class HangSpider extends Monster {
     ceiling_pos_y: number
 }
 declare class Shopkeeper extends RoomOwner {
+/** 
+0 - Ali, 1 - Bob, 2 - Comso ... and so one, anything above 28 is just random string, can crash the game
+ */
     name: number
+/** 
+can't shot when the timer is running
+ */
     shotgun_attack_delay: number
     shop_owner: boolean
 }
 declare class Yang extends RoomOwner {
+/** 
+Table of uid's of the turkeys, goes only up to 3, is nil when yang is angry
+ */
     turkeys_in_den: Array<number>
+/** 
+I'm looking for turkeys, wanna help?
+ */
     first_message_shown: boolean
+/** 
+Is set to false when the quest is over (Yang dead or second turkey delivered)
+ */
     quest_incomplete: boolean
+/** 
+Tusk palace/black market/one way door - message shown
+ */
     special_message_shown: boolean
 }
 declare class Tun extends RoomOwner {
     arrows_left: number
+/** 
+when 0, a new arrow is loaded numbero the bow; resets when she finds an arrow on the ground
+ */
     reload_timer: number
+/** 
+affect only the speech bubble
+ */
     challenge_fee_paid: boolean
+/** 
+congrats message shown after exiting a challenge
+ */
     congrats_challenge: boolean
     murdered: boolean
     shop_entered: boolean
+/** 
+if set to false, greets you with 'you've done well to reach this place'
+ */
     tiamat_encounter: boolean
 }
 declare class Pet extends Monster {
     fx_button: Entity
+/** 
+person whos petting it, only in the camp
+ */
     petting_by_uid: number
+/** 
+counts up to 400 (6.6 sec), when 0 the pet yells out
+ */
     yell_counter: number
+/** 
+used when free running in the camp
+ */
     func_timer: number
+/** 
+-1 = sitting and yelling, 0 = either running, dead or picked up
+ */
     active_state: number
 }
 declare class Caveman extends WalkingMonster {
     wake_up_timer: number
+/** 
+0 = can pick something up, when holding forced to 179, after tripping and regaining consciousness counts down to 0
+ */
     can_pick_up_timer: number
+/** 
+keeps resetting when angry and a player is nearby
+ */
     aggro_timer: number
 }
 declare class CavemanShopkeeper extends WalkingMonster {
@@ -1217,8 +2506,17 @@ declare class CavemanShopkeeper extends WalkingMonster {
     shop_entered: boolean
 }
 declare class HornedLizard extends Monster {
+/** 
+dungbeetle being eaten
+ */
     eaten_uid: number
+/** 
+alternates between walking and pausing when timer reaches zero
+ */
     walk_pause_timer: number
+/** 
+won't attack until timer reaches zero
+ */
     attack_cooldown_timer: number
     blood_squirt_timer: number
     particle: ParticleEmitterInfo
@@ -1231,14 +2529,26 @@ declare class Mosquito extends Monster {
     timer: number
 }
 declare class Mantrap extends Monster {
+/** 
+alternates between walking and pausing every time it reaches zero
+ */
     walk_pause_timer: number
+/** 
+the uid of the entity the mantrap has eaten, in case it can break out, like a shopkeeper
+ */
     eaten_uid: number
 }
 declare class Skeleton extends Monster {
+/** 
+-1 = never explodes
+ */
     explosion_timer: number
 }
 declare class Scarab extends Monster {
     emitted_light: Illumination
+/** 
+how long to stay in current position
+ */
     timer: number
 }
 declare class Imp extends Monster {
@@ -1247,10 +2557,16 @@ declare class Imp extends Monster {
 }
 declare class Lavamander extends Monster {
     emitted_light: Illumination
+/** 
+when this timer reaches zero, it appears on the surface/shoots lava, triggers on player proximity
+ */
     shoot_lava_timer: number
     jump_pause_timer: number
     lava_detection_timer: number
     is_hot: boolean
+/** 
+0 - didnt_saw_player, 1 - saw_player, 2 - spited_lava | probably used so he won't spit imminently after seeing the player
+ */
     player_detect_state: number
 }
 declare class Firebug extends Monster {
@@ -1273,6 +2589,9 @@ declare class Quillback extends WalkingMonster {
 declare class Leprechaun extends WalkingMonster {
     hump_timer: number
     target_in_sight_timer: number
+/** 
+amount of gold he picked up, will be drooped on death
+ */
     gold: number
     timer_after_humping: number
 }
@@ -1283,6 +2602,9 @@ declare class Mummy extends Monster {
     walk_pause_timer: number
 }
 declare class VanHorsing extends NPC {
+/** 
+if set to true, he will say 'i've been hunting this fiend a long time!' when on screen
+ */
     show_text: boolean
 }
 declare class WitchDoctor extends WalkingMonster {
@@ -1304,7 +2626,13 @@ declare class Vampire extends Monster {
     walk_pause_timer: number
 }
 declare class Vlad extends Vampire {
+/** 
+triggers when Vlad teleports, when timer running he can't teleport and will stun when hit
+ */
     teleport_timer: number
+/** 
+or is awake
+ */
     aggro: boolean
 }
 declare class Waddler extends RoomOwner {
@@ -1315,6 +2643,9 @@ declare class Waddler extends RoomOwner {
 declare class Octopus extends WalkingMonster {
 }
 declare class Bodyguard extends NPC {
+/** 
+0 - none, 1 - Tusk dice shop, 2 - Entrence to pleasure palace, 3 - Basement entrance to pleasure palace
+ */
     position_state: number
     message_shown: boolean
 }
@@ -1322,6 +2653,9 @@ declare class Fish extends Monster {
     change_direction_timer: number
 }
 declare class GiantFish extends Monster {
+/** 
+when bouncing numbero a wall
+ */
     change_direction_timer: number
     lose_interest_timer: void
 }
@@ -1338,6 +2672,9 @@ declare class Kingu extends Monster {
     climb_pause_timer: number
     shell_invincibility_timer: number
     monster_spawn_timer: number
+/** 
+excalibur wipes out immediately, bombs take off 11 ponumbers, when 0 vulnerable to whip
+ */
     initial_shell_health: number
     player_seen_by_kingu: boolean
 }
@@ -1385,6 +2722,9 @@ declare class Ammit extends Monster {
 declare class ApepPart extends Monster {
     y_pos: number
     sine_angle: number
+/** 
+or pause timer, used to sync the body parts moving up and down
+ */
     sync_timer: number
 }
 declare class ApepHead extends ApepPart {
@@ -1394,6 +2734,9 @@ declare class ApepHead extends ApepPart {
     fx_mouthpiece2_uid: number
 }
 declare class OsirisHead extends Monster {
+/** 
+right from his perspective
+ */
     right_hand_uid: number
     left_hand_uid: number
     moving_left: boolean
@@ -1435,7 +2778,13 @@ declare class Lamassu extends Monster {
 }
 declare class Olmite extends WalkingMonster {
     armor_on: boolean
+/** 
+disables the attack, stun, lock's looking left flag between stack
+ */
     in_stack: boolean
+/** 
+is set to false couple frame after being detached from stack
+ */
     in_stack2: boolean
     on_top_uid: number
     y_offset: number
@@ -1461,6 +2810,9 @@ declare class GiantFrog extends Monster {
     frogs_ejected_in_cycle: number
     invincibility_timer: number
     mouth_close_timer: number
+/** 
+opens the mouth and starts mouth_close_timer, used when detecting grub in the mouth area
+ */
     mouth_open_trigger: boolean
 }
 declare class Frog extends Monster {
@@ -1473,6 +2825,9 @@ declare class FireFrog extends Frog {
 declare class Grub extends Monster {
     rotation_delta: number
     drop: boolean
+/** 
+used when he touches floor/wall/ceiling
+ */
     looking_for_new_direction_timer: number
     walk_pause_timer: number
     turn_into_fly_timer: void
@@ -1517,23 +2872,38 @@ declare class Hundun extends Monster {
     fireball_timer: number
     birdhead_defeated: boolean
     snakehead_defeated: boolean
+/** 
+1:  Will move to the left, 2: Birdhead emerged, 3: Snakehead emerged, 4: Top level arena reached, 5: Birdhead shot last - to alternate the heads shooting fireballs
+ */
     hundun_flags: number
 }
 declare class HundunHead extends Monster {
+/** 
+Posiotion where the head will move on attack
+ */
     attack_position_x: number
     attack_position_y: number
     egg_crack_effect_uid: number
     targeted_player_uid: number
+/** 
+also cooldown before attack
+ */
     looking_for_target_timer: number
     invincibility_timer: number
 }
 declare class MegaJellyfish extends Monster {
     flipper1: Entity
     flipper2: Entity
+/** 
+the closest orb, does not gets updated
+ */
     orb_uid: number
     tail_bg_uid: number
     applied_velocity: number
     wagging_tail_counter: number
+/** 
+only applies to door-blocking one
+ */
     flipper_distance: number
     velocity_application_timer: number
 }
@@ -1545,8 +2915,14 @@ declare class Hermitcrab extends Monster {
     carried_entity_type: ENT_TYPE
     carried_entity_uid: number
     walk_spit_timer: number
+/** 
+whether it is hidden behind the carried block or not, if true you can damage him
+ */
     is_active: boolean
     is_inactive: boolean
+/** 
+defaults to true, when toggled to false, a new carried item spawns
+ */
     spawn_new_carried_item: boolean
 }
 declare class Necromancer extends WalkingMonster {
@@ -1556,8 +2932,14 @@ declare class Necromancer extends WalkingMonster {
     resurrection_timer: number
 }
 declare class ProtoShopkeeper extends Monster {
+/** 
+1: "Headpulse/explosion related, 2: Walking, 3: Headpulse/explosion related, 4: Crawling, 6: Headpulse/explosion related
+ */
     movement_state: number
     walk_pause_explode_timer: number
+/** 
+0 = slow, 4 = fast
+ */
     walking_speed: number
 }
 declare class Beg extends NPC {
@@ -1574,6 +2956,9 @@ declare class Critter extends Monster {
     holding_state: number
 }
 declare class CritterBeetle extends Critter {
+/** 
+used when he's getting eaten
+ */
     pause: boolean
 }
 declare class CritterCrab extends Critter {
@@ -1631,11 +3016,20 @@ declare class CritterSlime extends Critter {
     walk_pause_timer: number
 }
 declare class Bomb extends Movable {
+/** 
+1.25 = default regular bomb, 1.875 = default giant bomb, > 1.25 generates ENT_TYPE_FX_POWEREDEXPLOSION
+ */
     scale_hor: number
     scale_ver: number
+/** 
+is bomb from powerpack
+ */
     is_big_bomb: boolean
 }
 declare class Backpack extends Movable {
+/** 
+More like on fire trigger, the explosion happens when the timer reaches > 29
+ */
     explosion_trigger: boolean
     explosion_timer: number
 }
@@ -1660,25 +3054,46 @@ declare class Mattock extends Movable {
 }
 declare class Gun extends Movable {
     cooldown: number
+/** 
+used only for webgun
+ */
     shots: number
+/** 
+used only for clonegun
+ */
     shots2: number
+/** 
+Only for webgun, uid of the webshot entity
+ */
     in_chamber: number
 }
 declare class Flame extends Movable {
     emitted_light: Illumination
 }
 declare class FlameSize extends Flame {
+/** 
+if changed, gradually goes down |0.03 per frame| to the default size
+ */
     flame_size: number
 }
 declare class ClimbableRope extends Movable {
     segment_nr_inverse: number
+/** 
+entity is killed after 20
+ */
     burn_timer: number
     above_part: Entity
     below_part: Entity
     segment_nr: number
 }
 declare class Idol extends Movable {
+/** 
+if you set it to true for the ice caves or volcano idol, the trap won't trigger
+ */
     trap_triggered: boolean
+/** 
+changes to 0 when first picked up by player and back to -1 if HH picks it up
+ */
     touch: number
     spawn_x: number
     spawn_y: number
@@ -1691,6 +3106,9 @@ declare class JungleSpearCosmetic extends Movable {
     move_y: number
 }
 declare class WebShot extends Movable {
+/** 
+if false, it's attached to the gun
+ */
     shot: boolean
 }
 declare class HangStrand extends Movable {
@@ -1716,6 +3134,9 @@ declare class LightEmitter extends Movable {
 }
 declare class ScepterShot extends LightEmitter {
     speed: number
+/** 
+short timer before it goes after target
+ */
     idle_timer: number
 }
 declare class SpecialShot extends LightEmitter {
@@ -1730,9 +3151,21 @@ declare class Spark extends Flame {
     rotation_center_x: number
     rotation_center_y: number
     rotation_angle: number
+/** 
+slowly goes down to default 1.0, is 0.0 when not on screen
+ */
     size: number
+/** 
+0.0 when not on screen
+ */
     size_multiply: number
+/** 
+width and height will be set to this value  size_multiply next frame
+ */
     next_size: number
+/** 
+very short timer before next size change, giving a pulsing effect
+ */
     size_change_timer: number
 }
 declare class TiamatShot extends LightEmitter {
@@ -1741,6 +3174,9 @@ declare class Fireball extends SoundShot {
     particle: ParticleEmitterInfo
 }
 declare class Leaf extends Movable {
+/** 
+counts to 100.0 then the leaf fades away
+ */
     fade_away_counter: number
     swing_direction: number
     fade_away_trigger: boolean
@@ -1764,9 +3200,15 @@ declare class StretchChain extends Movable {
 }
 declare class Chest extends Movable {
     leprechaun: boolean
+/** 
+size of the bomb is random, if set both true only leprechaun spawns
+ */
     bomb: boolean
 }
 declare class Treasure extends Movable {
+/** 
+spawns a dust effect and adds money for the total
+ */
     cashed: boolean
 }
 declare class HundunChest extends Treasure {
@@ -1797,6 +3239,9 @@ declare class Torch extends Movable {
     is_lit: boolean
 }
 declare class WallTorch extends Torch {
+/** 
+if false, it will drop gold when light up
+ */
     dropped_gold: boolean
 }
 declare class TorchFlame extends Flame {
@@ -1842,6 +3287,9 @@ declare class OlmecCannon extends Movable {
     bombs_left: number
 }
 declare class Landmine extends LightEmitter {
+/** 
+explodes at 57, if you set it to 58 will count to overflow
+ */
     timer: number
 }
 declare class UdjatSocket extends Movable {
@@ -1862,6 +3310,9 @@ declare class PlayerGhost extends LightEmitter {
     sparkles_particle: ParticleEmitterInfo
     player_inputs: PlayerInputs
     inventory: Inventory
+/** 
+Is not set to -1 when crushed
+ */
     body_uid: number
     shake_timer: number
     boost_timer: number
@@ -1893,6 +3344,9 @@ declare class SkullDropTrap extends Movable {
     left_skull_drop_time: number
     middle_skull_drop_time: number
     right_skull_drop_time: number
+/** 
+counts from 60 3 times, the last time dropping the skulls, then random longer timer for reset
+ */
     timer: number
 }
 declare class FrozenLiquid extends Movable {
@@ -1918,6 +3372,9 @@ declare class MiniGameShip extends Movable {
     velocity_x: number
     velocity_y: number
     swing: number
+/** 
+0.0 - down, 1.0 - up, 0.5 - idle
+ */
     up_down_normal: number
 }
 declare class MiniGameAsteroid extends Movable {
@@ -1962,6 +3419,9 @@ declare class KapalaPowerup extends Powerup {
     amount_of_blood: number
 }
 declare class ParachutePowerup extends Powerup {
+/** 
+this gets compared with entity's falling_timer
+ */
     falltime_deploy: number
     deployed: boolean
     deploy(): void
@@ -1995,6 +3455,10 @@ declare class Shield extends Movable {
     shake: number
 }
 declare class PrizeDispenser extends Movable {
+/** 
+Id's of the items (not types), by default 0-24, look at [change_diceshop_prizes](#change_diceshop_prizes) for the list of default prizes
+so for example: id 0 equals ITEM_PICKUP_BOMBBAG, id 1 equals ITEM_PICKUP_BOMBBOX etc. Game generates 6 but uses max 5 for Tusk dice shop
+ */
     item_ids: Array<number>
     prizes_spawned: number
 }
@@ -2015,20 +3479,42 @@ declare class EggshipCenterJetFlame extends Movable {
 declare class MiniGameShipOffset extends Movable {
     offset_x: number
     offset_y: number
+/** 
+Is added to offset_y
+ */
     normal_y_offset: number
 }
 declare class Button extends Movable {
+/** 
+Flags: 1 - pad: A, key: Z | 2 - pad: X, key: X | 3 - pad: B, key: C | 4- pad: Y, key: D
+5 - pad: LB, key: L Shift | 6 - pad: RB, key: A | 7 - pad: menu?, key: (none) | 8 - pad: copy?, key: Tab
+ */
     button_sprite: number
     visibility: number
+/** 
+It's false for selldialog used in shops
+ */
     is_visible: boolean
+/** 
+It's set true even if player does not see the button, like the drill or COG door
+ */
     player_trigger: boolean
+/** 
+-1 - hasn't been seen | 0 - last seen by player 1 | 1 - last seen by player 2 | 2 - last seen by player 3 | 3 - last seen by player 4
+ */
     seen: number
 }
 declare class FxTornJournalPage extends Movable {
+/** 
+Only in tutorial
+ */
     page_number: number
 }
 declare class FxMainExitDoor extends Movable {
     emitted_light: Illumination
+/** 
+When breaking open in tutorial
+ */
     timer: number
 }
 declare class Birdies extends Movable {
@@ -2046,21 +3532,36 @@ declare class FxOuroboroDragonPart extends Movable {
 declare class Rubble extends Movable {
 }
 declare class FxCompass extends Movable {
+/** 
+Counts form 0 to 2pi, responsible for moving back and forth
+ */
     sine_angle: number
     visibility: number
+/** 
+Player has compass
+ */
     is_active: boolean
 }
 declare class SleepBubble extends Movable {
     show_hide_timer: number
 }
 declare class MovingIcon extends Movable {
+/** 
+Used to move it up and down in sync with others
+ */
     movement_timer: number
 }
 declare class FxSaleContainer extends Movable {
     fx_value: Entity
     fx_icon: Entity
     fx_button: Entity
+/** 
+For effect when you don't have enough money
+ */
     shake_amplitude: number
+/** 
+Also sound_played, keeps re-triggering from time to time
+ */
     sound_trigger: boolean
     pop_in_out_procentage: number
 }
@@ -2092,7 +3593,13 @@ declare class FxWebbedEffect extends Movable {
 }
 declare class FxUnderwaterBubble extends Movable {
     bubble_source_uid: number
+/** 
+1 / -1
+ */
     direction: number
+/** 
+Setting it true makes it disappear/fade away
+ */
     pop: boolean
     inverted: boolean
 }
@@ -2113,9 +3620,15 @@ declare class FxTiamatHead extends Movable {
 }
 declare class FxTiamatTorso extends Movable {
     timer: number
+/** 
+Slowly increases/decreases to the given value
+ */
     torso_target_size: number
 }
 declare class FxTiamatTail extends Movable {
+/** 
+Added _two just to not shadow angle in entity, it's angle but the pivot ponumber is at the edge
+ */
     angle_two: number
     x_pos: number
     y_pos: number
@@ -2124,6 +3637,9 @@ declare class FxVatBubble extends Movable {
     max_y: number
 }
 declare class FxHundunNeckPiece extends Movable {
+/** 
+Short timer after the head is dead
+ */
     kill_timer: number
 }
 declare class FxJellyfishStar extends Movable {
@@ -2142,6 +3658,9 @@ declare class FxLamassuAttack extends Movable {
 declare class FxFireflyLight extends Movable {
     illumination: Illumination
     light_timer: number
+/** 
+Timer between light flashes
+ */
     cooldown_timer: number
 }
 declare class FxEmpress extends Movable {
@@ -2150,6 +3669,9 @@ declare class FxEmpress extends Movable {
 declare class FxAnkhRotatingSpark extends Movable {
     radius: number
     inclination: number
+/** 
+0 - 1.0
+ */
     speed: number
     sine_angle: number
     size: number
@@ -2190,6 +3712,9 @@ declare class BGEggshipRoom extends Entity {
     player_in: boolean
 }
 declare class BGMovingStar extends BGSurfaceStar {
+/** 
+Can make it rise if set to negative
+ */
     falling_speed: number
 }
 declare class BGTutorialSign extends Entity {
@@ -2200,12 +3725,18 @@ declare class BGShootingStar extends BGRelativeElement {
     y_increment: number
     timer: number
     max_timer: number
+/** 
+Gets smaller as the timer gets close to the max_timer
+ */
     size: number
 }
 declare class BGShopEntrence extends Entity {
     on_entering: boolean
 }
 declare class BGFloatingDebris extends BGSurfaceLayer {
+/** 
+Distance it travels up and down from spawn position
+ */
     distance: number
     speed: number
     sine_angle: number
@@ -2244,6 +3775,9 @@ declare class ShootingStarSpawner extends Entity {
 declare class LogicalDoor extends Entity {
     door_type: ENT_TYPE
     visible: boolean
+/** 
+Is set true when you bomb the door, no matter what door, can't be reset
+ */
     platform_spawned: boolean
 }
 declare class LogicalSound extends Entity {
@@ -2253,7 +3787,13 @@ declare class LogicalStaticSound extends LogicalSound {
 declare class LogicalLiquidStreamSound extends LogicalStaticSound {
 }
 declare class LogicalTrapTrigger extends Entity {
+/** 
+Used in bigspeartrap when it has to have minimum 2 free spaces to be able to trigger, value in tiles
+ */
     min_empty_distance: number
+/** 
+Value in tiles
+ */
     trigger_distance: number
     vertical: boolean
 }
@@ -2271,6 +3811,9 @@ declare class PoisonedEffect extends Entity {
     particle_burst: ParticleEmitterInfo
     particle_base: ParticleEmitterInfo
     burst_timer: number
+/** 
+If forced to false, it will not play the sound or spawn burst particles
+ */
     burst_active: boolean
 }
 declare class CursedEffect extends Entity {
@@ -2283,11 +3826,17 @@ declare class OuroboroCameraAnchor extends Entity {
     velocity_y: number
 }
 declare class OuroboroCameraZoomin extends Entity {
+/** 
+Can be set to negative, seams to trigger the warp at some value
+ */
     zoomin_level: number
 }
 declare class CinematicAnchor extends Entity {
     blackbar_top: Entity
     blackbar_bottom: Entity
+/** 
+0.0 to 1.0
+ */
     roll_in: number
 }
 declare class BurningRopeEffect extends Entity {
@@ -2311,12 +3860,18 @@ declare class LimbAnchor extends Entity {
 declare class LogicalConveyorbeltSound extends LogicalSound {
 }
 declare class LogicalAnchovyFlock extends Entity {
+/** 
+Increases until max_speed reached
+ */
     current_speed: number
     max_speed: number
     timer: number
 }
 declare class MummyFliesSound extends LogicalSound {
     mummy_uid: number
+/** 
+Numbers of flies spawned
+ */
     flies: number
 }
 declare class QuickSandSound extends LogicalSound {
@@ -2327,12 +3882,18 @@ declare class FrostBreathEffect extends Entity {
     timer: number
 }
 declare class BoulderSpawner extends Entity {
+/** 
+Can be set negative for longer time period, spawns boulder at 150, setting it higher with count to overflow
+ */
     timer: number
 }
 declare class PipeTravelerSound extends LogicalSound {
     enter_exit: boolean
 }
 declare class LogicalDrain extends Entity {
+/** 
+Little delay between pulling blob of liquid thru
+ */
     timer: number
 }
 declare class LogicalRegeneratingBlock extends Entity {
@@ -2344,6 +3905,9 @@ declare class SplashBubbleGenerator extends Entity {
 declare class EggplantThrower extends Entity {
 }
 declare class LogicalMiniGame extends Entity {
+/** 
+Delay between spwning ufo
+ */
     timer: number
 }
 declare class DMSpawning extends Entity {
@@ -2396,7 +3960,16 @@ declare class ParticleEmitterInfo {
     offset_y: number
 }
 declare class PreLoadLevelFilesContext {
+/** 
+Block all loading `.lvl` files and instead load the specified `.lvl` files. This includes `generic.lvl` so if you need it specify it here.
+All `.lvl` files are loaded relative to `Data/Levels`, but they can be completely custom `.lvl` files that ship with your mod so long as they are in said folder.
+Use at your own risk, some themes/levels expect a certain level file to be loaded.
+ */
     override_level_files(levels: Array<string>): void
+/** 
+Load additional levels files other than the ones that would usually be loaded. Stacks with `override_level_files` if that was called first.
+All `.lvl` files are loaded relative to `Data/Levels`, but they can be completely custom `.lvl` files that ship with your mod so long as they are in said folder.
+ */
     add_level_files(levels: Array<string>): void
 }
 declare class DoorCoords {
@@ -2414,27 +3987,93 @@ declare class LevelGenSystem {
     exits: DoorCoords
 }
 declare class PostRoomGenerationContext {
+/** 
+Set the room template at the given index and layer, returns `false` if the index is outside of the level.
+ */
     set_room_template(x: number, y: number, layer: LAYER, room_template: ROOM_TEMPLATE): boolean
+/** 
+Marks the room as the origin of a machine room, should be the top-left corner of the machine room
+Run this after setting the room template for the room, otherwise the machine room will not spawn correctly
+ */
     mark_as_machine_room_origin(x: number, y: number, layer: LAYER): boolean
+/** 
+Marks the room as a set-room, a corresponding `setroomy-x` template must be loaded, else the game will crash
+ */
     mark_as_set_room(x: number, y: number, layer: LAYER): boolean
+/** 
+Unmarks the room as a set-room
+ */
     unmark_as_set_room(x: number, y: number, layer: LAYER): boolean
+/** 
+Force a spawn chance for this level, has the same restrictions as specifying the spawn chance in the .lvl file.
+Note that the actual chance to spawn is `1/inverse_chance` and that is also slightly skewed because of technical reasons.
+Returns `false` if the given chance is not defined.
+ */
     set_procedural_spawn_chance(chance_id: PROCEDURAL_CHANCE, inverse_chance: number): boolean
+/** 
+Change the amount of extra spawns for the given `extra_spawn_id`.
+ */
     set_num_extra_spawns(extra_spawn_id: number, num_spawns_front_layer: number, num_spawns_back_layer: number): void
+/** 
+Defines a new short tile code, automatically picks an unused character or returns a used one in case of an exact match
+Returns `nil` if all possible short tile codes are already in use
+ */
     define_short_tile_code(short_tile_code_def: ShortTileCodeDef): SHORT_TILE_CODE | undefined
+/** 
+Overrides a specific short tile code, this means it will change for the whole level
+ */
     change_short_tile_code(short_tile_code: SHORT_TILE_CODE, short_tile_code_def: ShortTileCodeDef): void
 }
 declare class PreHandleRoomTilesContext {
+/** 
+Gets the tile code at the specified tile coordinate
+Valid coordinates are `0 <= tx < CONST.ROOM_WIDTH`, `0 <= ty < CONST.ROOM_HEIGHT` and `layer` in `{LAYER.FRONT, LAYER.BACK}`
+Also returns `nil` if `layer == LAYER.BACK` and the room does not have a back layer
+ */
     get_short_tile_code(tx: number, ty: number, layer: LAYER): SHORT_TILE_CODE | undefined
+/** 
+Sets the tile code at the specified tile coordinate
+Valid coordinates are `0 <= tx < CONST.ROOM_WIDTH`, `0 <= ty < CONST.ROOM_HEIGHT` and `layer` in `{LAYER.FRONT, LAYER.BACK, LAYER.BOTH}`
+Also returns `false` if `layer == LAYER.BACK` and the room does not have a back layer
+ */
     set_short_tile_code(tx: number, ty: number, layer: LAYER, short_tile_code: SHORT_TILE_CODE): boolean
-    find_all_short_tile_codes(layer: LAYER, short_tile_code: SHORT_TILE_CODE): Array<[number, number, LAYER]>
+/** 
+Finds all places a short tile code is used in the room, `layer` must be in `{LAYER.FRONT, LAYER.BACK, LAYER.BOTH}`
+Returns an empty list if `layer == LAYER.BACK` and the room does not have a back layer
+ */
+    find_all_short_tile_codes(layer: LAYER, short_tile_code: SHORT_TILE_CODE): Array<LuaMultiReturn<[number, number, LAYER]>>
+/** 
+Replaces all instances of `short_tile_code` in the given layer with `replacement_short_tile_code`, `layer` must be in `{LAYER.FRONT, LAYER.BACK, LAYER.BOTH}`
+Returns `false` if `layer == LAYER.BACK` and the room does not have a back layer
+ */
     replace_short_tile_code(layer: LAYER, short_tile_code: SHORT_TILE_CODE, replacement_short_tile_code: SHORT_TILE_CODE): boolean
+/** 
+Check whether the room has a back layer
+ */
     has_back_layer(): boolean
+/** 
+Add a back layer filled with all `0` if there is no back layer yet
+Does nothing if there already is a backlayer
+ */
     add_empty_back_layer(): void
+/** 
+Add a back layer that is a copy of the front layer
+Does nothing if there already is a backlayer
+ */
     add_copied_back_layer(): void
 }
 declare class ShortTileCodeDef {
+/** 
+Tile code that is used by default when this short tile code is encountered. Defaults to 0.
+ */
     tile_code: TILE_CODE
+/** 
+Chance in percent to pick `tile_code` over `alt_tile_code`, ignored if `chance == 0`. Defaults to 100.
+ */
     chance: number
+/** 
+Alternative tile code, ignored if `chance == 100`. Defaults to 0.
+ */
     alt_tile_code: TILE_CODE
 }
 declare class QuestsInfo {
@@ -2573,24 +4212,87 @@ declare class PlayerInputs {
     player_slot_4_settings: PlayerSlotSettings
 }
 declare class GuiDrawContext {
+/** 
+Draws a line on screen
+ */
     draw_line(x1: number, y1: number, x2: number, y2: number, thickness: number, color: uColor): void
+/** 
+Draws a rectangle on screen from top-left to bottom-right.
+ */
     draw_rect(left: number, top: number, right: number, bottom: number, thickness: number, rounding: number, color: uColor): void
+/** 
+Draws a rectangle on screen from top-left to bottom-right.
+ */
     draw_rect(rect: AABB, thickness: number, rounding: number, color: uColor): void
+/** 
+Draws a filled rectangle on screen from top-left to bottom-right.
+ */
     draw_rect_filled(left: number, top: number, right: number, bottom: number, rounding: number, color: uColor): void
+/** 
+Draws a filled rectangle on screen from top-left to bottom-right.
+ */
     draw_rect_filled(rect: AABB, rounding: number, color: uColor): void
+/** 
+Draws a circle on screen
+ */
     draw_circle(x: number, y: number, radius: number, thickness: number, color: uColor): void
+/** 
+Draws a filled circle on screen
+ */
     draw_circle_filled(x: number, y: number, radius: number, color: uColor): void
+/** 
+Draws text in screen coordinates `x`, `y`, anchored top-left. Text size 0 uses the default 18.
+ */
     draw_text(x: number, y: number, size: number, text: string, color: uColor): void
+/** 
+Draws an image on screen from top-left to bottom-right. Use UV coordinates `0, 0, 1, 1` to just draw the whole image.
+ */
     draw_image(image: IMAGE, left: number, top: number, right: number, bottom: number, uvx1: number, uvy1: number, uvx2: number, uvy2: number, color: uColor): void
+/** 
+Draws an image on screen from top-left to bottom-right. Use UV coordinates `0, 0, 1, 1` to just draw the whole image.
+ */
     draw_image(image: IMAGE, rect: AABB, uv_rect: AABB, color: uColor): void
+/** 
+Same as `draw_image` but rotates the image by angle in radians around the pivot offset from the center of the rect (meaning `px=py=0` rotates around the center)
+ */
     draw_image_rotated(image: IMAGE, left: number, top: number, right: number, bottom: number, uvx1: number, uvy1: number, uvx2: number, uvy2: number, color: uColor, angle: number, px: number, py: number): void
+/** 
+Same as `draw_image` but rotates the image by angle in radians around the pivot offset from the center of the rect (meaning `px=py=0` rotates around the center)
+ */
     draw_image_rotated(image: IMAGE, rect: AABB, uv_rect: AABB, color: uColor, angle: number, px: number, py: number): void
+/** 
+Create a new widget window. Put all win_ widgets inside the callback Callback. The window Callbacks are just wrappers for the
+[ImGui](https://github.com/ocornut/imgui/) widgets, so read more about them there. Use screen position and distance, or `0, 0, 0, 0` to
+autosize in center. Use just a `##Label` as title to hide titlebar.
+Important: Keep all your labels unique! If you need inputs with the same label, add `##SomeUniqueLabel` after the text, or use pushid to
+give things unique ids. ImGui doesn't know what you clicked if all your buttons have the same text... The window api is probably evolving
+still, this is just the first draft. Felt cute, might delete later!
+Returns false if the window was closed from the X.
+ */
     window(title: string, x: number, y: number, w: number, h: number, movable: boolean, callback: Callback): boolean
+/** 
+Add some text to window, automatically wrapped
+ */
     win_text(text: string): void
+/** 
+Add a separator line to window
+ */
     win_separator(): void
+/** 
+Add next thing on the same line. This is same as `win_sameline(0, -1)`
+ */
     win_inline(): void
+/** 
+Add next thing on the same line, with an offset
+ */
     win_sameline(offset: number, spacing: number): void
+/** 
+Add a button
+ */
     win_button(text: string): boolean
+/** 
+Add a text field
+ */
     win_input_text(label: string, value: string): string
     win_input_int: string
     win_input_float: string
@@ -2598,15 +4300,30 @@ declare class GuiDrawContext {
     win_drag_int: string
     win_slider_float: string
     win_drag_float: string
+/** 
+Add a checkbox
+ */
     win_check(label: string, value: boolean): boolean
+/** 
+Add a combo box
+ */
     win_combo(label: string, selected: number, opts: string): number
+/** 
+Add unique identifier to the stack, to distinguish identical inputs from each other. Put before the input.
+ */
     win_pushid(id: number): void
+/** 
+Pop unique identifier from the stack. Put after the input.
+ */
     win_popid(): void
+/** 
+Draw image to window.
+ */
     win_image(image: IMAGE, width: number, height: number): void
 }
 declare class ImVec2 {
-    x: void
-    y: void
+    x: number
+    y: number
 }
 declare class ImGuiIO {
     displaysize: ImVec2
@@ -2629,11 +4346,29 @@ declare class ImGuiIO {
     gamepad: void
 }
 declare class VanillaRenderContext {
+/** 
+Draw text using the built-in renderer. Use in combination with ON.RENDER_✱ events. See vanilla_rendering.lua in the example scripts.
+ */
     draw_text(text: string, x: number, y: number, scale_x: number, scale_y: number, color: Color, alignment: number, fontstyle: number): void
-    draw_text_size(text: string, scale_x: number, scale_y: number, fontstyle: number): [number, number]
+/** 
+Measure the provided text using the built-in renderer
+ */
+    draw_text_size(text: string, scale_x: number, scale_y: number, fontstyle: number): LuaMultiReturn<[number, number]>
+/** 
+Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
+ */
     draw_screen_texture(texture_id: TEXTURE, row: number, column: number, left: number, top: number, right: number, bottom: number, color: Color): void
+/** 
+Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
+ */
     draw_screen_texture(texture_id: TEXTURE, row: number, column: number, rect: AABB, color: Color): void
+/** 
+Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
+ */
     draw_world_texture(texture_id: TEXTURE, row: number, column: number, left: number, top: number, right: number, bottom: number, color: Color): void
+/** 
+Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
+ */
     draw_world_texture(texture_id: TEXTURE, row: number, column: number, rect: AABB, color: Color): void
 }
 declare class TextureRenderingInfo {
@@ -2677,20 +4412,51 @@ declare class TextureDefinition {
     sub_image_height: number
 }
 declare class AABB {
-    constructor()
-    constructor(AABB: AABB)
-    constructor(left_: number, top_: number, right_: number, bottom_: number)
+/** 
+Create a new axis aligned bounding box - defaults to all zeroes
+ */
+    static new(): AABB
+/** 
+Copy an axis aligned bounding box
+ */
+    static new(AABB: AABB): AABB
+/** 
+Create a new axis aligned bounding box by specifying its values
+ */
+    static new(left_: number, top_: number, right_: number, bottom_: number): AABB
     left: number
     bottom: number
     right: number
     top: number
     overlaps_with(other: AABB): boolean
+/** 
+Fixes the AABB if any of the sides have negative length
+ */
     abs(): AABB
+/** 
+Grows or shrinks the AABB by the given amount in all directions.
+If `amount < 0` and `abs(amount) > right/top - left/bottom` the respective dimension of the AABB will become `0`.
+ */
     extrude(amount: number): AABB
+/** 
+Offsets the AABB by the given offset.
+ */
     offset(off_x: number, off_y: number): AABB
+/** 
+Compute area of the AABB, can be zero if one dimension is zero or negative if one dimension is inverted.
+ */
     area(): number
-    center(): [number, number]
+/** 
+Short for `(aabb.left + aabb.right) / 2.0f, (aabb.top + aabb.bottom) / 2.0f`.
+ */
+    center(): LuaMultiReturn<[number, number]>
+/** 
+Short for `aabb.right - aabb.left`.
+ */
     width(): number
+/** 
+Short for `aabb.top - aabb.bottom`.
+ */
     height(): number
 }
 declare class Screen {
@@ -3345,23 +5111,9 @@ declare class ScreenArenaScore extends Screen {
     player_create_giblets: Array<boolean>
     next_sidepanel_slidein_timer: number
 }
-//## Automatic casting of entities
-//When using `get_entity()` the returned entity will automatically be of the correct type. It is not necessary to use the `as_<typename>` functions.
 
-//To figure out what type of entity you get back, consult the [entity hierarchy list](entities-hierarchy.md)
-//You can also use the types (uppercase `<typename>`) as `ENT_TYPE.<typename>` in `get_entities` functions and `pre/post spawn` callbacks
-
-//For reference, the available `as_<typename>` functions are listed below:
 //## Enums
-//Enums are like numbers but in text that's easier to remember. Example:
-/*```lua
-set_callback(function()
-    if state.theme == THEME.COSMIC_OCEAN then
-        x, y, l = get_position(players[1].uid)
-        spawn(ENT_TYPE.ITEM_JETPACK, x, y, l, 0, 0)
-    end
-end, ON.LEVEL)
-```*/
+
 
 declare enum BEG {
   ALTAR_DESTROYED = 1,
@@ -7156,63 +8908,24 @@ declare enum YANG {
   TURKEY_SHOP_SPAWNED = 4,
   TWO_TURKEYS_BOUGHT = 6
 }
-declare const MAX_PLAYERS: number // 4
+//was made for fixing arrays of size MAX_PLAYERS, but since I removed the max size because TS doesn't have those, isn't needed
+//declare const MAX_PLAYERS: 4
+
 declare type in_port_t = number
 declare class Logic {}
-declare class UdpServer {
-    constructor(host: string, port: in_port_t, cb: Callback);
-    host: string;
-    port: in_port_t;
-    cb: Callback;
-    sock: any;
-}
-type IMAGE = number
-declare class Texture
-{
-    id: TEXTURE;
-    name: string;
-    width: number;
-    height: number;
-    num_tiles_width: number;
-    num_tiles_height: number;
-    offset_x_weird_math: number;
-    offset_y_weird_math: number;
-    tile_width_fraction: number;
-    tile_height_fraction: number;
-    tile_width_minus_one_fraction: number;
-    tile_height_minus_one_fraction: number;
-    one_over_width: number;
-    one_over_height: number;
-}
-declare class SpearDanglerAnimFrames
-{
-    column: number;
-    row: number;
-}
-declare class OnlineLobbyScreenPlayer
-{
-    unknown1: number;
-    character: number;
-    ready: boolean;
-    unknown2: number;
-}
-declare class OnlinePlayerShort
-{
-    unknown1: number;
-    unknown2: number;
-    unknown3: number;
-    unknown4: number;
-    unknown5: number;
-    ready_state: number;
-    character: number;
-    player_name: string; //[33] this smells fishy... why fewer chars available for local name, but leave at 37 for the player structs?
-}
+
+
+declare type OnlinePlayerShort = any
+declare type UdpServer = any
+declare type Texture = any
+declare type SpearDanglerAnimFrames = any
+declare type OnlineLobbyScreenPlayer = any
+
 //## Aliases
-//We use those to clarify what kind of values can be passed and returned from a function, even if the underlying type is really just an integer or a string. This should help to avoid bugs where one would for example just pass a random integer to a function expecting a callback id.
-type CallbackId = number;
-type Flags = number;
-type uColor = number;
-type SHORT_TILE_CODE = number;
-type STRINGID = number;
-//## External Function Library
-//If you use a text editor/IDE that has a Lua linter available you can download [spel2.lua](https://raw.githubusercontent.com/spelunky-fyi/overlunky/main/docs/game_data/spel2.lua), place it in a folder of your choice and specify that folder as a "external function library". For example [VSCode](https://code.visualstudio.com/) with the [Lua Extension](https://marketplace.visualstudio.com/items?itemName=sumneko.lua) offers this feature. This will allow you to get auto-completion of API functions along with linting
+
+declare type IMAGE = number
+declare type CallbackId = number;
+declare type Flags = number;
+declare type uColor = number;
+declare type SHORT_TILE_CODE = number;
+declare type STRINGID = number;

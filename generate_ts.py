@@ -164,7 +164,7 @@ def rpcfunc(name):
     return ret
 
 reArr = re.compile(r"(Array<\w+), [^>]*?(>+)")
-reTuple = re.compile(r"tuple<(.*?)>(>*)")
+reTuple = re.compile(r"tuple<(.*?)>")
 reOptional = re.compile(r"optional<(.+?)>")
 reBool = re.compile(r"bool\b")
 def replace_all(text, dic):
@@ -176,7 +176,7 @@ def replace_all(text, dic):
             continue
         text = text.replace(i, j)
     text = reArr.sub(r"\1\2", text)#TODO Possible solution: use tuples to use the max size. bad thing: some arrays show max size as MAX_PLAYERS.
-    text = reTuple.sub(r"[\1]\2", text)
+    text = reTuple.sub(r"LuaMultiReturn<[\1]>", text)
     text = reBool.sub("boolean", text)
     text = reOptional.sub(r"\1 | undefined", text)
     #match = re.search(r"(Array<.*), .*>", text)
@@ -193,7 +193,6 @@ reRemoveDefault = re.compile(r" = .*")
 reHandleConst = re.compile(r"const (\w+) (\w+)")
 def cpp_params_to_typescript(params_text):
     return_text = ""
-    print("//PARAS: " + params_text)
     params_iterator = reGetParam.finditer(params_text)
     for param_match in params_iterator:
         p_type = param_match.group(1)
@@ -202,7 +201,6 @@ def cpp_params_to_typescript(params_text):
         if p_type == "sol::variadic_args":
             return_text += f"...{p_name}: any[], "
         else:
-            print("//PARAM_TYPE:" + p_type + "PARAM_NAME: " + p_name)
             if m := reHandleConst.match(p_name):
                 p_type = m.group(1)
                 p_name = m.group(2)
@@ -211,8 +209,6 @@ def cpp_params_to_typescript(params_text):
 
 reConstructorFix = re.compile(r"const (\w+)")
 def fix_constructor_param(params_text):
-    #print(f"//_PARAMS_TEXT: {params_text}")
-    #print("//_CONSTRUCTOR_FIX", reConstructorFix.sub(r"\1", params_text))
     return reConstructorFix.sub(r"\1: \1", params_text)
 
 
@@ -227,6 +223,11 @@ def print_af(lf, af):
     fun = f"declare function {name}({param}) : {ret}".strip()
     #search_link = "https://github.com/spelunky-fyi/overlunky/search?l=Lua&q=" + name
     #print(f"### [`{name}`]({search_link})")
+    if lf["comment"]:
+        print("/** ")
+        for com in lf["comment"]:
+            print(com)
+        print(" */")
     print(fun)
     #for com in lf["comment"]:
     #    print(com)
@@ -430,7 +431,6 @@ for file in api_files:
             cpp_name = cpp[cpp.find("::") + 2 :] if cpp.find("::") >= 0 else cpp
 
             if var[0].startswith("sol::constructors"):
-                #print("//CONSTRUCTORS_A: ", underlying_cpp_type["member_funs"][cpp_type])
                 for fun in underlying_cpp_type["member_funs"][cpp_type]:
                     param = fun["param"]
                     if "const" in param:
@@ -438,10 +438,10 @@ for file in api_files:
                     elif param == fun["name"]:
                         continue
                     else:
-                        #print(f"//CONSTRUCTOR_PARAM: {param}")
                         param = cpp_params_to_typescript(param)
                     #sig = f"{cpp_type}({param})"
-                    sig = f"constructor({param})"
+                    #Will be changed to ts later
+                    sig = f"static {cpp_type} new({param})"
                     vars.append(
                         {
                             "name": cpp_type,
@@ -453,13 +453,9 @@ for file in api_files:
             elif cpp_name in underlying_cpp_type["member_funs"]:
                 for fun in underlying_cpp_type["member_funs"][cpp_name]:
                     ret = fun["return"]
-                    #if "static" in ret:
-                        #ret = re.sub(r"static +(\w+)", r"\1", ret)
-                        #var_name = "static " + var_name
                     param = fun["param"]
                     param = cpp_params_to_typescript(param)
                     sig = f"{ret} {var_name}({param})"
-                    print(f"//__FUNCTION: Name:'{var_name}', ret:'{ret}', param:'{param}'")
                     vars.append(
                         {
                             "name": var_name,
@@ -521,7 +517,8 @@ for file in api_files:
         if c:
             comment.append(c.group(1))
 
-#DELETED ENUM STUFF, we will get enums at spel2.lua
+#DELETED ENUM STUFF, we will get enums with spel2.lua
+#TODO: get some enums that have comments, like ON or SPAWN_TYPE
 
 for file in api_files:
     data = open(file, "r").read()
@@ -557,27 +554,27 @@ for line in data:
 #        for com in lf["comment"]:
 #            print(com)
 
-#TODO: CHECK
 print(
-    """
-declare interface meta {
+    """/** @noSelfInFile */
+declare interface Meta {
     name: string;
     version: string;
     description: string;
     author: string;
 }
+declare let meta: Meta;
+
 declare const state: StateMemory;
 declare const game_manager: GameManager;
 declare const online: Online;
 declare const players: Array<Player>;
 declare const savegame: SaveData;
-declare const options: unknown;
+declare const options: any;
 declare const prng: PRNG;
 declare interface Callback {
-    /** @noself **/
-    (...args: any[]): void;
+    (...args: any[]): any;
 }
-declare interface SoundCallbackFunction extends Callback {}"""
+declare interface SoundCallbackFunction extends Callback {}""" #make class with extends or type = Callback?
 )
 
 #deprecated_funcs = [
@@ -589,10 +586,8 @@ funcs = [
     if not func["comment"] or not func["comment"][0] == "Deprecated"
 ]
 
-print("//## Functions")
-print(
-    "//Note: The game functions like `spawn` use [level coordinates](#get_position). Draw functions use normalized [screen coordinates](#screen_position) from `-1.0 .. 1.0` where `0.0, 0.0` is the center of the screen."
-)
+print("\n//## Functions\n")
+
 for lf in funcs:
     if len(rpcfunc(lf["cpp"])):
         for af in rpcfunc(lf["cpp"]):
@@ -611,11 +606,12 @@ for lf in funcs:
             param = cpp_params_to_typescript(param)
             param = replace_all(param, replace).strip()
         name = lf["name"]
-        #fun = f"{ret} {name}({param})".strip()
         fun = f"declare function {name}({param}) : {ret}".strip()
-        #search_link = "https://github.com/spelunky-fyi/overlunky/search?l=Lua&q=" + name
-        #print(f"### [`{name}`]({search_link})")
-        #print(f"`{fun}`<br/>")
+        if lf["comment"]:
+            print("/** ")
+            for com in lf["comment"]:
+                print(com)
+            print(" */")
         print(fun)
         #for com in lf["comment"]:
         #    print(com)
@@ -663,25 +659,7 @@ for lf in funcs:
 #        for com in lf["comment"]:
 #            print(com)
 
-print("//## Types")
-print(
-    "//Using the api through these directly is kinda dangerous, but such is life. I got pretty bored writing this doc generator at this point, so you can find the variable types in the [source files](https://github.com/spelunky-fyi/overlunky/tree/main/src/game_api). They're mostly just ints and floats. Example:"
-)
-print(
-    """/*```lua
--- This doesn't make any sense, as you could just access the variables directly from players[]
--- It's just a weird example OK!
-ids = get_entities_by_mask(MASK.PLAYER) -- This just covers CHARs
-for i,id in ipairs(ids) do
-    e = get_entity(id)     -- casts Entity to Player automatically
-    e.health = 99          -- setting Player::health
-    e.inventory.bombs = 99 -- setting Inventory::bombs
-    e.inventory.ropes = 99 -- setting Inventory::ropes
-    e.type.jump = 0.36     -- setting EntityDB::jump
-end
-```*/"""
-)
-
+print("\n//## Types\n")
 for type in types:
     print("declare class " + type["name"], end="")
     if type["base"]:
@@ -689,6 +667,11 @@ for type in types:
         print(" extends " + bases[-1], end="")
     print(" {")
     for var in type["vars"]:
+        if "comment" in var and var["comment"]:
+            print("/** ")
+            for com in var["comment"]:
+                print(com)
+            print(" */")
         if "signature" in var:
             signature = var["signature"]
             m = re.search(r"\s*(.*)\s+([^\(]*)\(([^\)]*)", var["signature"])
@@ -701,80 +684,19 @@ for type in types:
                     name = "static " + name
                 signature = name + "(" + param + "): " + ret
             signature = signature.strip()
-            #type_str = var["type"].replace("<", "&lt;").replace(">", "&gt;")
-            #print(f"- [`{signature}`]({search_link}) {type_str}")
             #print("has_sig")
             print("    " + signature)
         else:
             #print("not_sig_has")
             name = var["name"]
-            #type_str = var["type"].replace("<", "&lt;").replace(">", "&gt;")
             print(f"    {name}: {ret}")
-            #print(f"- [`{name}`]({search_link}) {type_str}")
     print("}")
 
-#for type in types:
-#    print("### `" + type["name"] + "`")
-#    if "comment" in type:
-#        for com in type["comment"]:
-#            print(com)
-#    if type["base"]:
-#        print("Derived from", end="")
-#        bases = type["base"].split(",")
-#        print(bases[-1])
-#        #for base in bases:
-#        #    print(" [`" + base + "`](#" + base.lower() + ")", end="")
-#        #print()
-#    for var in type["vars"]:
-#        search_link = (
-#            "https://github.com/spelunky-fyi/overlunky/search?l=Lua&q=" + var["name"]
-#        )
-#        if "signature" in var:
-#            signature = var["signature"]
-#            m = re.search(r"\s*(.*)\s+([^\(]*)\(([^\)]*)", var["signature"])
-#            if m:
-#                ret = replace_all(m.group(1), replace) or "nil"
-#                name = m.group(2)
-#                param = replace_all(m.group(3), replace)
-#                signature = ret + " " + name + "(" + param + ")"
-#            signature = signature.strip()
-#            type_str = var["type"].replace("<", "&lt;").replace(">", "&gt;")
-#            print(f"- [`{signature}`]({search_link}) {type_str}")
-#        else:
-#            name = var["name"]
-#            type_str = var["type"].replace("<", "&lt;").replace(">", "&gt;")
-#            print(f"- [`{name}`]({search_link}) {type_str}")
-#        if "comment" in var and var["comment"]:
-#            print("\\")
-#            for com in var["comment"]:
-#                print(com)
-
-print("//## Automatic casting of entities")
-print(
-    "//When using `get_entity()` the returned entity will automatically be of the correct type. It is not necessary to use the `as_<typename>` functions."
-)
-print("")
-print(
-    "//To figure out what type of entity you get back, consult the [entity hierarchy list](entities-hierarchy.md)"
-)
-print("//You can also use the types (uppercase `<typename>`) as `ENT_TYPE.<typename>` in `get_entities` functions and `pre/post spawn` callbacks")
-print("")
-print("//For reference, the available `as_<typename>` functions are listed below:")
+#print("//## Automatic casting of entities")
 #for known_cast in known_casts:
 #    print("- " + known_cast)
 
-print("//## Enums")
-print("//Enums are like numbers but in text that's easier to remember. Example:")
-print(
-    """/*```lua
-set_callback(function()
-    if state.theme == THEME.COSMIC_OCEAN then
-        x, y, l = get_position(players[1].uid)
-        spawn(ENT_TYPE.ITEM_JETPACK, x, y, l, 0, 0)
-    end
-end, ON.LEVEL)
-```*/"""
-)
+print("\n//## Enums\n")
 enumStr = ""
 data = open("./game_data/spel2.lua", "r", encoding="latin-1").read()
 match_i = re.finditer(r"\n[A-Z_]+? = {\n(?! *__)[\s\S]+?\n}", data)
@@ -806,63 +728,54 @@ print(enumStr)
 #            print(var["docs"])
 
 #EXTRA THINGS
-#TODO: do smth to include something from file (without doing it manually) 
 print(
-    """const MAX_PLAYERS: number // 4
+"""//was made for fixing arrays of size MAX_PLAYERS, but since I removed the max size because TS doesn't have those, isn't needed
+//declare const MAX_PLAYERS: 4
+
 declare type in_port_t = number
 declare class Logic {}
-declare class UdpServer {
-    constructor(host: string, port: in_port_t, cb: Callback);
-    host: string;
-    port: in_port_t;
-    cb: Callback;
-    sock: any;
-}
-type IMAGE = number
-declare class Texture
-{
-    id: TEXTURE;
-    name: string;
-    width: number;
-    height: number;
-    num_tiles_width: number;
-    num_tiles_height: number;
-    offset_x_weird_math: number;
-    offset_y_weird_math: number;
-    tile_width_fraction: number;
-    tile_height_fraction: number;
-    tile_width_minus_one_fraction: number;
-    tile_height_minus_one_fraction: number;
-    one_over_width: number;
-    one_over_height: number;
-}
-declare class SpearDanglerAnimFrames
-{
-    column: number;
-    row: number;
-}
-declare class OnlineLobbyScreenPlayer
-{
-    unknown1: number;
-    character: number;
-    ready: boolean;
-    unknown2: number;
-}"""
 
+
+declare type OnlinePlayerShort = any
+declare type UdpServer = any
+declare type Texture = any
+declare type SpearDanglerAnimFrames = any
+declare type OnlineLobbyScreenPlayer = any"""
 )
 
-print("//## Aliases")
-print(
-    "//We use those to clarify what kind of values can be passed and returned from a function, even if the underlying type is really just an integer or a string. This should help to avoid bugs where one would for example just pass a random integer to a function expecting a callback id."
-)
+print("\n//## Aliases\n")
+print("declare type IMAGE = number")
 for alias in aliases:
     name = alias["name"]
     type = alias["type"]
     #print(f"### {name} == {type}")
-    print(f"type {name} = {type}")
+    print(f"declare type {name} = {type}")
 
-print("//## External Function Library")
-print(
-    '//If you use a text editor/IDE that has a Lua linter available you can download [spel2.lua](https://raw.githubusercontent.com/spelunky-fyi/overlunky/main/docs/game_data/spel2.lua), place it in a folder of your choice and specify that folder as a "external function library". For example [VSCode](https://code.visualstudio.com/) with the [Lua Extension](https://marketplace.visualstudio.com/items?itemName=sumneko.lua) offers this feature. This will allow you to get auto-completion of API functions along with linting'
-)
 #print(classes)
+
+sys.stdout.close()
+sys.stdout = sys.__stdout__
+
+#Replace some things
+final_replace_stuff = {
+"""declare class ImVec2 {
+    x: void
+    y: void
+}""":
+"""declare class ImVec2 {
+    x: number
+    y: number
+}""",
+"is_poisoned(): boolean": "is_poisoned: (() => {}) | boolean",
+"drop(entity_to_drop: Entity): void": "drop: ((entity_to_drop: Entity) => {}) | boolean",
+"menu_text_opacity: number\n    menu_text_opacity: number": "menu_text_opacity: number"
+}
+
+with open('spel2_declarations_unmodified.d.ts', 'r') as file :
+  declarations_text = file.read()
+
+for find, replacement in final_replace_stuff.items():
+    declarations_text = declarations_text.replace(find, replacement)
+
+with open('spel2_declarations_unmodified.d.ts', 'w') as file:
+  file.write(declarations_text)
