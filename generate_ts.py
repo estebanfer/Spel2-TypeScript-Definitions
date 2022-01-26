@@ -745,7 +745,49 @@ print(
 
 declare type in_port_t = number
 declare class Logic {}
-
+declare class Gamepad {
+    enabled: boolean
+    /**
+    * Bitmask of the device digital buttons, as follows. A set bit indicates that the corresponding button is pressed.
+    *
+    * Device button	Bitmask:
+    *
+    * XINPUT_GAMEPAD_DPAD_UP	0x0001
+    *
+    * XINPUT_GAMEPAD_DPAD_DOWN	0x0002
+    *
+    * XINPUT_GAMEPAD_DPAD_LEFT	0x0004
+    *
+    * XINPUT_GAMEPAD_DPAD_RIGHT	0x0008
+    *
+    * XINPUT_GAMEPAD_START	0x0010
+    *
+    * XINPUT_GAMEPAD_BACK	0x0020
+    *
+    * XINPUT_GAMEPAD_LEFT_THUMB	0x0040
+    *
+    * XINPUT_GAMEPAD_RIGHT_THUMB	0x0080
+    *
+    * XINPUT_GAMEPAD_LEFT_SHOULDER	0x0100
+    *
+    * XINPUT_GAMEPAD_RIGHT_SHOULDER	0x0200
+    *
+    * XINPUT_GAMEPAD_A	0x1000
+    *
+    * XINPUT_GAMEPAD_B	0x2000
+    *
+    * XINPUT_GAMEPAD_X	0x4000
+    *
+    * XINPUT_GAMEPAD_Y	0x8000
+    */
+    buttons: number
+    lt: number
+    rt: number
+    lx: number
+    ly: number
+    rx: number
+    ry: number
+}
 
 declare type OnlinePlayerShort = any
 declare type UdpServer = any
@@ -780,6 +822,58 @@ final_replace_stuff = {
 "is_poisoned(): boolean": "is_poisoned: (() => {}) | boolean",
 "drop(entity_to_drop: Entity): void": "drop: ((entity_to_drop: Entity) => {}) | boolean",
 "menu_text_opacity: number\n    menu_text_opacity: number": "menu_text_opacity: number",
+"""declare class ImGuiIO {
+    displaysize: ImVec2
+    framerate: number
+    wantkeyboard: boolean
+    keysdown: any //unknown
+    keydown: any //unknown
+    keypressed: any //unknown
+    keyreleased: any //unknown
+    keyctrl: boolean
+    keyshift: boolean
+    keyalt: boolean
+    keysuper: boolean
+    wantmouse: boolean
+    mousepos: ImVec2
+    mousedown: any //unknown
+    mouseclicked: any //unknown
+    mousedoubleclicked: any //unknown
+    mousewheel: number
+    gamepad: any //unknown
+}""": """declare class ImGuiIO {
+    displaysize: ImVec2
+    framerate: number
+    wantkeyboard: boolean
+    /**
+    * array size: 512 
+    * Note: lua starts indexing at 1, you need `keysdown[string.byte('A') + 1]` to find the A key.
+    */
+    keysdown: Array<boolean>
+    keydown(key: number | string): boolean
+    keypressed(key: number | string, repeat?: boolean ): boolean
+    keyreleased(key: number | string): boolean
+    keyctrl: boolean
+    keyshift: boolean
+    keyalt: boolean
+    keysuper: boolean
+    wantmouse: boolean
+    mousepos: ImVec2
+    /** array size: 5.
+    * Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Others buttons allows us to track if the mouse is being used by your application
+    */
+    mousedown: Array<boolean>
+    /** array size: 5.
+    * Mouse button went from !Down to Down
+    */
+    mouseclicked: Array<boolean>
+    /** array size: 5.
+    * Has mouse button been double-clicked?
+    */
+    mousedoubleclicked: Array<boolean>
+    mousewheel: number
+    gamepad: Gamepad
+}"""
 }
 
 with open('spel2_declarations_unmodified.d.ts', 'r') as file :
