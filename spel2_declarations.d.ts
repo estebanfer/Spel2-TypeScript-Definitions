@@ -1033,7 +1033,7 @@ Returns: [ImGuiIO](#imguiio) for raw keyboard, mouse and xinput gamepad stuff. T
 - Note: Overlunky/etc will eat all keys it is currently configured to use, your script will only get leftovers.
 - Note: `gamepad` is basically [XINPUT_GAMEPAD](https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_gamepad) but variables are renamed and values are normalized to -1.0..1.0 range.
  */
-declare function get_io() : void
+declare function get_io() : ImGuiIO
 /** 
 Alters the drop chance for the provided monster-item combination (use e.g. set_drop_chance(DROPCHANCE.MOLE_MATTOCK, 10) for a 1 in 10 chance)
 Use `-1` as dropchance_id to reset all to default
@@ -1323,7 +1323,7 @@ Run totals
     screen_constellation: ScreenConstellation
     screen_recap: ScreenRecap
     screen_arena_stages_select: ScreenArenaStagesSelect
-    screen_arena_intro: void
+    screen_arena_intro: ScreenArenaIntro
     screen_arena_level: ScreenArenaLevel
     screen_arena_score: ScreenArenaScore
     screen_arena_menu: ScreenArenaMenu
@@ -1355,7 +1355,7 @@ Who pops out the spaceship for a tiamat/hundun win, this is set upon the spacesh
 declare class GameManager {
     game_props: GameProps
     screen_logo: ScreenLogo
-    screen_intro: void
+    screen_intro: ScreenIntro
     screen_prologue: ScreenPrologue
     screen_title: ScreenTitle
     screen_menu: ScreenMenu
@@ -1455,7 +1455,7 @@ declare class Online {
 declare class OnlinePlayer {
     ready_state: number
     character: number
-    player_name: void
+    player_name: any //unknown
 }
 declare class OnlineLobby {
     code: number
@@ -1502,16 +1502,22 @@ declare class PRNG {
 Same as `seed_prng`
  */
     seed(seed: number): void
-    random_float: void
+/** 
+Generate a random floating point number in the range `[0, 1)`
+ */
+    random_float(type: PRNG_CLASS): number
 /** 
 Returns true with a chance of `1/inverse_chance`
  */
     random_chance(inverse_chance: number, type: PRNG_CLASS): boolean
 /** 
-Generate a numbereger number in the range `[1, i]` or `nil` if `i < 1`
+Generate a integer number in the range `[1, i]` or `nil` if `i < 1`
  */
     random_index(i: number, type: PRNG_CLASS): number | undefined
-    random_int: number | undefined
+/** 
+Generate a integer number in the range `[min, max]` or `nil` if `max < min`
+ */
+    random_int(min: number, max: number, type: PRNG_CLASS): number | undefined
 /** 
 Drop-in replacement for `math.random()`
  */
@@ -1524,8 +1530,8 @@ Drop-in replacement for `math.random(i)`
 Drop-in replacement for `math.random(min, max)`
  */
     random(min: number, max: number): number | undefined
-    get_pair: number | undefined
-    set_pair: number | undefined
+    get_pair: any //unknown
+    set_pair: any //unknown
 }
 declare class Color {
 /** 
@@ -1577,7 +1583,7 @@ Changes color based on given uColor
 declare class Animation {
     first_tile: number
     num_tiles: number
-    interval: void
+    interval: number
     repeat_mode: REPEAT_TYPE
 }
 declare class EntityDB {
@@ -1585,17 +1591,17 @@ declare class EntityDB {
     search_flags: number
     width: number
     height: number
-    offsetx: void
-    offsety: void
-    hitboxx: void
-    hitboxy: void
+    offsetx: number
+    offsety: number
+    hitboxx: number
+    hitboxy: number
     draw_depth: number
     friction: number
     elasticity: number
     weight: number
     acceleration: number
     max_speed: number
-    sprint_factor: void
+    sprint_factor: number
     jump: number
     glow_red: number
     glow_green: number
@@ -1605,7 +1611,7 @@ declare class EntityDB {
     life: number
     blood_content: number
     texture: number
-    animations: void
+    animations: LuaTable<number, Animation>
     properties_flags: number
     default_flags: number
     default_more_flags: number
@@ -1674,18 +1680,18 @@ Completely removes the entity from existence
  */
     destroy(): void
 /** 
-Activates a button prompt (with the Use door/Buy button), e.g. buy shop item, activate drill, read sign, numbereract in camp, ... `get_entity(<udjat socket uid>):activate(players[1])` (make sure player 1 has the udjat eye though)
+Activates a button prompt (with the Use door/Buy button), e.g. buy shop item, activate drill, read sign, interact in camp, ... `get_entity(<udjat socket uid>):activate(players[1])` (make sure player 1 has the udjat eye though)
  */
     activate(activator: Entity): void
 /** 
-Performs a teleport as if the entity had a teleporter and used it. The delta coordinates are where you want the entity to teleport to relative to its current position, in tiles (so numberegers, not numbers). Positive numbers = to the right and up, negative left and down.
+Performs a teleport as if the entity had a teleporter and used it. The delta coordinates are where you want the entity to teleport to relative to its current position, in tiles (so integers, not floats). Positive numbers = to the right and up, negative left and down.
  */
     perform_teleport(delta_x: number, delta_y: number): void
 /** 
 Triggers weapons and other held items like teleportter, mattock etc. You can check the [virtual-availability.md](virtual-availability.md), if entity has `open` in the `on_open` you can use this Callback, otherwise it does nothing. Returns false if action could not be performed (cooldown is not 0, no arrow loaded in etc. the animation could still be played thou)
  */
     trigger_action(user: Entity): boolean
-    get_metadata: boolean
+    get_metadata: any //unknown
     apply_metadata(metadata: number): void
 }
 declare class Movable extends Entity {
@@ -1968,7 +1974,7 @@ Explicitly add a decoration on the given side. Corner decorations only exist for
 Explicitly remove a decoration on the given side. Corner decorations only exist for `FLOOR_BORDERTILE` and `FLOOR_BORDERTILE_OCTOPUS`.
  */
     remove_decoration(side: FLOOR_SIDE): void
-    decorate_internal: void
+    decorate_internal(): void
 }
 declare class Door extends Floor {
     counter: number
@@ -2052,7 +2058,10 @@ for the start and retract
     timer: number
 }
 declare class TransferFloor extends Floor {
-    transferred_entities: void
+/** 
+Index is the uid, value is frame the entity entered the floor (time_level), use `pairs` to loop thru
+ */
+    transferred_entities: LuaTable<number, number>
 }
 declare class ConveyorBelt extends TransferFloor {
     timer: number
@@ -2209,7 +2218,7 @@ general timer that counts down whenever olmec is active
     jump_timer: number
     phase1_amount_of_bomb_salvos: number
     unknown_attack_state: number
-    broken_floaters: void
+    broken_floaters(): number
 }
 declare class WoodenlogTrap extends Movable {
     ceiling_1_uid: number
@@ -2316,14 +2325,14 @@ declare class RoomOwner extends Monster {
     climb_y_direction: number
     ai_state: number
     patrol_timer: number
-    lose_interest_timer: void
+    lose_interest_timer: number
 /** 
 can't shot when the timer is running
  */
     countdown_timer: number
     is_patrolling: boolean
 /** 
-setting this makes him angry, if it's shopkeeper you get 2 agrro ponumbers
+setting this makes him angry, if it's shopkeeper you get 2 agrro points
  */
     aggro_trigger: boolean
 /** 
@@ -2371,7 +2380,7 @@ wait time between jumps
  */
     wait_timer: number
 /** 
-only female aka assassin: when 0 will jump up numbero ceiling
+only female aka assassin: when 0 will jump up into ceiling
  */
     jump_counter: number
 /** 
@@ -2453,7 +2462,7 @@ Tusk palace/black market/one way door - message shown
 declare class Tun extends RoomOwner {
     arrows_left: number
 /** 
-when 0, a new arrow is loaded numbero the bow; resets when she finds an arrow on the ground
+when 0, a new arrow is loaded into the bow; resets when she finds an arrow on the ground
  */
     reload_timer: number
 /** 
@@ -2654,10 +2663,13 @@ declare class Fish extends Monster {
 }
 declare class GiantFish extends Monster {
 /** 
-when bouncing numbero a wall
+when bouncing into a wall
  */
     change_direction_timer: number
-    lose_interest_timer: void
+/** 
+delay in-between attacks
+ */
+    lose_interest_timer: number
 }
 declare class Crabman extends Monster {
     walk_pause_timer: number
@@ -2673,7 +2685,7 @@ declare class Kingu extends Monster {
     shell_invincibility_timer: number
     monster_spawn_timer: number
 /** 
-excalibur wipes out immediately, bombs take off 11 ponumbers, when 0 vulnerable to whip
+excalibur wipes out immediately, bombs take off 11 points, when 0 vulnerable to whip
  */
     initial_shell_health: number
     player_seen_by_kingu: boolean
@@ -2830,7 +2842,7 @@ used when he touches floor/wall/ceiling
  */
     looking_for_new_direction_timer: number
     walk_pause_timer: number
-    turn_into_fly_timer: void
+    turn_into_fly_timer: number
     particle: ParticleEmitterInfo
 }
 declare class Tadpole extends Monster {
@@ -3044,7 +3056,7 @@ declare class Hoverpack extends Backpack {
     is_on: boolean
 }
 declare class Cape extends Backpack {
-    floating_down: void
+    floating_down: boolean
 }
 declare class VladsCape extends Cape {
     can_double_jump: boolean
@@ -3184,7 +3196,7 @@ counts to 100.0 then the leaf fades away
 declare class AcidBubble extends Movable {
     speed_x: number
     speed_y: number
-    float_counter: void
+    float_counter: number
 }
 declare class Claw extends Movable {
     crabman_uid: number
@@ -3468,7 +3480,7 @@ declare class LiquidSurface extends Movable {
     sine_pos_increment: number
 }
 declare class OlmecFloater extends Movable {
-    both_floaters_intact: void
+    both_floaters_intact: boolean
     on_breaking: boolean
 }
 declare class EggshipCenterJetFlame extends Movable {
@@ -3586,6 +3598,8 @@ declare class FxSpringtrapRing extends Movable {
     timer: number
     illumination: Illumination
 }
+declare class FxWitchdoctorHint extends Movable {
+}
 declare class FxNecromancerANKH extends Movable {
 }
 declare class FxWebbedEffect extends Movable {
@@ -3627,7 +3641,7 @@ Slowly increases/decreases to the given value
 }
 declare class FxTiamatTail extends Movable {
 /** 
-Added _two just to not shadow angle in entity, it's angle but the pivot ponumber is at the edge
+Added _two just to not shadow angle in entity, it's angle but the pivot point is at the edge
  */
     angle_two: number
     x_pos: number
@@ -3926,7 +3940,7 @@ declare class ParticleDB {
     lifespan: number
     sheet_id: number
     animation_sequence_length: number
-    spawn_interval: void
+    spawn_interval: number
     shrink_growth_factor: number
     rotation_speed: number
     opacity: number
@@ -4090,7 +4104,7 @@ declare class SaveData {
     people: Array<boolean>
     items: Array<boolean>
     traps: Array<boolean>
-    last_daily: void
+    last_daily: any //unknown
     characters: number
     shortcuts: number
     bestiary_killed: Array<number>
@@ -4130,7 +4144,7 @@ declare class Constellation {
     scale: number
     line_count: number
     lines: Array<ConstellationLine>
-    line_red_intensity: void
+    line_red_intensity: number
 }
 declare class ConstellationStar {
     type: number
@@ -4294,12 +4308,30 @@ Add a button
 Add a text field
  */
     win_input_text(label: string, value: string): string
-    win_input_int: string
-    win_input_float: string
-    win_slider_int: string
-    win_drag_int: string
-    win_slider_float: string
-    win_drag_float: string
+/** 
+Add an integer field
+ */
+    win_input_int(label: string, value: number): number
+/** 
+Add a number field
+ */
+    win_input_float(label: string, value: number): number
+/** 
+Add an integer slider
+ */
+    win_slider_int(label: string, value: number, min: number, max: number): number
+/** 
+Add an integer dragfield
+ */
+    win_drag_int(label: string, value: number, min: number, max: number): number
+/** 
+Add an number slider
+ */
+    win_slider_float(label: string, value: number, min: number, max: number): number
+/** 
+Add an number dragfield
+ */
+    win_drag_float(label: string, value: number, min: number, max: number): number
 /** 
 Add a checkbox
  */
@@ -4329,21 +4361,21 @@ declare class ImGuiIO {
     displaysize: ImVec2
     framerate: number
     wantkeyboard: boolean
-    keysdown: void
-    keydown: void
-    keypressed: void
-    keyreleased: void
+    keysdown: any //unknown
+    keydown: any //unknown
+    keypressed: any //unknown
+    keyreleased: any //unknown
     keyctrl: boolean
     keyshift: boolean
     keyalt: boolean
     keysuper: boolean
     wantmouse: boolean
     mousepos: ImVec2
-    mousedown: void
-    mouseclicked: void
-    mousedoubleclicked: void
+    mousedown: any //unknown
+    mouseclicked: any //unknown
+    mousedoubleclicked: any //unknown
     mousewheel: number
-    gamepad: void
+    gamepad: any //unknown
 }
 declare class VanillaRenderContext {
 /** 
@@ -4604,11 +4636,11 @@ declare class ScreenCharacterSelect extends Screen {
     player_shutter_timer: Array<number>
     player_x: Array<number>
     player_y: Array<number>
-    player_arrow_slidein_timer: number
+    player_arrow_slidein_timer: Array<Array<number>>
     player_facing_left: Array<boolean>
     player_quickselect_shown: Array<boolean>
     player_quickselect_fadein_timer: Array<number>
-    player_quickselect_coords: number
+    player_quickselect_coords: Array<Array<number>>
     player_quickselect_wiggle_angle: Array<number>
     topleft_woodpanel_esc_slidein_timer: number
     start_panel_slidein_timer: number
@@ -4794,7 +4826,7 @@ declare class ScreenOnlineLobby extends Screen {
     enter_code_main_woodpanel_right: TextureRenderingInfo
     enter_code_banner: TextureRenderingInfo
     enter_code_char_cutouts: TextureRenderingInfo
-    enter_code_pointing_hand: number
+    enter_code_pointing_hand: TextureRenderingInfo
     enter_code_buttons: TextureRenderingInfo
     enter_code_OK_panel: TextureRenderingInfo
     enter_code_OK_panel_slidein_timer: number

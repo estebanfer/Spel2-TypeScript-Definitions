@@ -107,8 +107,6 @@ replace = {
     "int32_t": "number",
     "int64_t": "number",
     "ImU32": "number",
-    "int": "number",
-    "float": "number",
     "vector": "Array",
     "array": "Array",
     "unordered_map": "LuaTable",
@@ -129,7 +127,7 @@ replace = {
     #"static": "",
     #"variadic_args va": "...ent_type: number[]",
     "...va:": "...ent_type:",
-    "// Access via": "void",
+    "// Access via": "ImGuiIO",
     "set<": "Array<",
     "&": "",
     "const string": "string",
@@ -163,10 +161,12 @@ def rpcfunc(name):
             ret.append(func)
     return ret
 
-reArr = re.compile(r"(Array<\w+), [^>]*?(>+)")
+#old reArr: r"(Array<\w+), [^>]*?(>+)"
+reArr = re.compile(r"(Array<(?:(?:\w*<\w*, \d>)|(?:\w+))), [^>]*?(>+)") #for removing the max size of arrays
 reTuple = re.compile(r"tuple<(.*?)>")
 reOptional = re.compile(r"optional<(.+?)>")
 reBool = re.compile(r"bool\b")
+reNumber = re.compile(r"\b(?:float|int)\b")
 def replace_all(text, dic):
     for i, j in dic.items():
         pos = text.find(i)
@@ -175,7 +175,15 @@ def replace_all(text, dic):
         if pos > 0 and br1 >= 0 and br2 > 0:
             continue
         text = text.replace(i, j)
-    text = reArr.sub(r"\1\2", text)#TODO Possible solution: use tuples to use the max size. bad thing: some arrays show max size as MAX_PLAYERS.
+    text = reNumber.sub("number", text)
+    if "Array<" in text: #Array<Array<float, 2>, MAX_PLAYERS>
+        newText = text
+        while True:
+            newText = reArr.sub(r"\1\2", text)#TODO Possible solution: use tuples to use the max size. bad thing: some arrays show max size as MAX_PLAYERS.
+            if newText == text:
+                break
+            text = newText
+        
     text = reTuple.sub(r"LuaMultiReturn<[\1]>", text)
     text = reBool.sub("boolean", text)
     text = reOptional.sub(r"\1 | undefined", text)
@@ -326,7 +334,7 @@ for file in header_files:
                         comment = []
 
                     m = re.search(
-                        r"\s*([^\;\{,]*)\s+([^\;^\{}]*)\s*(\{[^\}]*\})?\;", line
+                        r"\s*([^\;\{]*)\s+([^\;^\{}]*)\s*(\{[^\}]*\})?\;", line
                     )
                     if m:
                         member_vars.append(
@@ -689,7 +697,10 @@ for type in types:
         else:
             #print("not_sig_has")
             name = var["name"]
-            print(f"    {name}: {ret}")
+            if "->float" in var["type"]:
+                print(f"    {name}: number")
+            else:
+                print(f"    {name}: any //unknown")
     print("}")
 
 #print("//## Automatic casting of entities")
@@ -759,8 +770,8 @@ sys.stdout = sys.__stdout__
 #Replace some things
 final_replace_stuff = {
 """declare class ImVec2 {
-    x: void
-    y: void
+    x: any //unknown
+    y: number                                   x,
 }""":
 """declare class ImVec2 {
     x: number
@@ -768,7 +779,7 @@ final_replace_stuff = {
 }""",
 "is_poisoned(): boolean": "is_poisoned: (() => {}) | boolean",
 "drop(entity_to_drop: Entity): void": "drop: ((entity_to_drop: Entity) => {}) | boolean",
-"menu_text_opacity: number\n    menu_text_opacity: number": "menu_text_opacity: number"
+"menu_text_opacity: number\n    menu_text_opacity: number": "menu_text_opacity: number",
 }
 
 with open('spel2_declarations_unmodified.d.ts', 'r') as file :
