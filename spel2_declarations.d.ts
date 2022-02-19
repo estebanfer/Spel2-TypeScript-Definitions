@@ -1,4 +1,7 @@
 /** @noSelfInFile */
+// Does nothing but fixes docs and showns size
+type FixedSizeArray<T, N extends number> = Array<T>;
+
 declare interface Meta {
     name: string;
     version: string;
@@ -80,9 +83,9 @@ Add global callback function to be called on an [event](#on).
  */
 declare function set_callback(cb: Callback, screen: number) : CallbackId
 /** 
-Clear previously added callback `id`
+Clear previously added callback `id` or call without arguments inside any callback to clear that callback after it returns.
  */
-declare function clear_callback(id: CallbackId) : void
+declare function clear_callback() : void
 /** 
 Load another script by id "author/name"
  */
@@ -257,6 +260,8 @@ Set the zoom level used in levels and shops. 13.5 is the default.
 declare function zoom(level: number) : void
 /** 
 Enable/disable game engine pause.
+This is just short for `state.pause == 32`, but that produces an audio bug
+I suggest `state.pause == 2`, but that won't run any callback, `state.pause == 16` will do the same but `set_global_interval` will still work
  */
 declare function pause(p: boolean) : void
 /** 
@@ -751,7 +756,7 @@ declare function get_string(string_id: STRINGID) : string
 Change string at the given id (don't use stringid diretcly for vanilla string, use `hash_to_stringid` first)
 This edits custom string and in game strings but changing the language in settings will reset game strings
  */
-declare function change_string(string_id: STRINGID, str: string) : void
+declare function change_string(id: STRINGID, str: string) : void
 /** 
 Add custom string, currently can only be used for names of shop items (Entitydb->description)
 Returns STRINGID of the new string
@@ -812,6 +817,10 @@ Change how much health the ankh gives you after death, with every beat (the hear
 If you set `health` above the game max health it will be forced down to the game max
  */
 declare function modify_ankh_health_gain(max_health: number, beat_add_health: number) : void
+/** 
+Adds entity as shop item, has to be movable (haven't tested many)
+ */
+declare function add_item_to_shop(item_uid: number, shop_owner: number) : void
 /** 
 Creates a new Illumination. Don't forget to continuously call `refresh_illumination`, otherwise your light emitter fades out! Check out the illumination.lua script for an example
  */
@@ -977,6 +986,16 @@ Gets the value for the specified config
  */
 declare function get_level_config(config: LEVEL_CONFIG) : number
 /** 
+Customizable ThemeInfo with ability to override certain theming functions from different themes or write custom functions. Warning: We WILL change these function names, especially the unknown ones, when you figure out what they do.
+Overrides for different CustomTheme functions. Warning: We WILL change these, especially the unknown ones, and even the known ones if they turn out wrong in testing.
+Force a theme in PRE_LOAD_LEVEL_FILES, POST_ROOM_GENERATION or PRE_LEVEL_GENERATION to change different aspects of the levelgen. You can pass a CustomTheme, ThemeInfo or THEME.
+ */
+declare function force_custom_theme() : void
+/** 
+Force current subtheme used in the CO theme. You can pass a CustomTheme, ThemeInfo or THEME. Not to be confused with force_co_subtheme.
+ */
+declare function force_custom_subtheme() : void
+/** 
 Loads a sound from disk relative to this script, ownership might be shared with other code that loads the same file. Returns nil if file can't be found
  */
 declare function create_sound(path: string) : CustomSound | undefined
@@ -1034,6 +1053,8 @@ Returns: [ImGuiIO](#imguiio) for raw keyboard, mouse and xinput gamepad stuff. T
 - Note: `gamepad` is basically [XINPUT_GAMEPAD](https://docs.microsoft.com/en-us/windows/win32/api/xinput/ns-xinput-xinput_gamepad) but variables are renamed and values are normalized to -1.0..1.0 range.
  */
 declare function get_io() : ImGuiIO
+declare function set_lut(texture_id: TEXTURE | undefined, layer: LAYER) : void
+declare function reset_lut(layer: LAYER) : void
 /** 
 Alters the drop chance for the provided monster-item combination (use e.g. set_drop_chance(DROPCHANCE.MOLE_MATTOCK, 10) for a 1 in 10 chance)
 Use `-1` as dropchance_id to reset all to default
@@ -1053,6 +1074,10 @@ Defines a new texture that can be used in Entity::set_texture
 If a texture with the same definition already exists the texture will be reloaded from disk.
  */
 declare function define_texture(texture_data: TextureDefinition) : TEXTURE
+/** 
+Gets a texture with the same definition as the given, if none exists returns `nil`
+ */
+declare function get_texture(texture_data: TextureDefinition) : TEXTURE | undefined
 /** 
 Reloads a texture from disk, use this only as a development tool for example in the console
 Note that `define_texture` will also reload the texture if it already exists
@@ -1183,12 +1208,12 @@ declare class ArenaConfigEquippedItems {
 }
 declare class ArenaState {
     current_arena: number
-    player_teams: Array<number>
+    player_teams: FixedSizeArray<number, 4>
     format: number
     ruleset: number
-    player_lives: Array<number>
-    player_totalwins: Array<number>
-    player_won: Array<boolean>
+    player_lives: FixedSizeArray<number, 4>
+    player_totalwins: FixedSizeArray<number, 4>
+    player_won: FixedSizeArray<boolean, 4>
 /** 
 The menu selection for timer, default values 0..20 where 0 == 30 seconds, 19 == 10 minutes and 20 == infinite. Can go higher, although this will glitch the menu text. Actual time (seconds) = (state.arena.timer + 1) x 30
  */
@@ -1196,7 +1221,7 @@ The menu selection for timer, default values 0..20 where 0 == 30 seconds, 19 == 
     timer_ending: number
     wins: number
     lives: number
-    player_idolheld_countdown: Array<number>
+    player_idolheld_countdown: FixedSizeArray<number, 4>
     health: number
     bombs: number
     ropes: number
@@ -1227,11 +1252,32 @@ declare class Items {
 /** 
 Pet information for level transition
  */
-    saved_pets: Array<ENT_TYPE>
-    is_pet_cursed: Array<boolean>
-    is_pet_poisoned: Array<boolean>
-    player_inventory: Array<Inventory>
-    player_select: Array<SelectPlayerSlot>
+    saved_pets: FixedSizeArray<ENT_TYPE, 4>
+    is_pet_cursed: FixedSizeArray<boolean, 4>
+    is_pet_poisoned: FixedSizeArray<boolean, 4>
+    player_inventory: FixedSizeArray<Inventory, MAX_PLAYERS>
+    player_select: FixedSizeArray<SelectPlayerSlot, MAX_PLAYERS>
+}
+declare class LiquidPhysicsEngine {
+    pause: boolean
+    gravity: number
+    cohesion: number
+    elasticity: number
+    size: number
+    weight: number
+    count: number
+}
+declare class LiquidPhysicsParams {
+    gravity: number
+    cohesion: number
+    elasticity: number
+}
+declare class LiquidPool {
+    default: LiquidPhysicsParams
+    engine: LiquidPhysicsEngine
+}
+declare class LiquidPhysics {
+    pools: FixedSizeArray<LiquidPool, 5>
 }
 declare class StateMemory {
     screen_last: number
@@ -1239,6 +1285,9 @@ declare class StateMemory {
     screen_next: number
     ingame: number
     playing: number
+/** 
+`state.pause == 2` will pause the game but that won't run any callback, `state.pause == 16` will do the same but `set_global_interval` will still work
+ */
     pause: number
     width: number
     height: number
@@ -1351,6 +1400,7 @@ Who pops out the spaceship for a tiamat/hundun win, this is set upon the spacesh
     screen_change_counter: number
     time_startup: number
     logic: LogicList
+    liquid: LiquidPhysics
 }
 declare class GameManager {
     game_props: GameProps
@@ -1398,7 +1448,7 @@ declare class Illumination {
 /** 
 Table of light1, light2, ... etc.
  */
-    lights: Array<LightParams>
+    lights: FixedSizeArray<LightParams, 4>
     light1: LightParams
     light2: LightParams
     light3: LightParams
@@ -1448,14 +1498,14 @@ declare class Camera {
     inertia: number
 }
 declare class Online {
-    online_players: Array<OnlinePlayer>
+    online_players: FixedSizeArray<OnlinePlayer, 4>
     local_player: OnlinePlayerShort
     lobby: OnlineLobby
 }
 declare class OnlinePlayer {
     ready_state: number
     character: number
-    player_name: any //unknown
+    player_name: string
 }
 declare class OnlineLobby {
     code: number
@@ -1530,8 +1580,8 @@ Drop-in replacement for `math.random(i)`
 Drop-in replacement for `math.random(min, max)`
  */
     random(min: number, max: number): number | undefined
-    get_pair: any //unknown
-    set_pair: any //unknown
+    get_pair: any // &PRNG::get_pair
+    set_pair: any // &PRNG::set_pair
 }
 declare class Color {
 /** 
@@ -1588,6 +1638,9 @@ declare class Animation {
 }
 declare class EntityDB {
     id: ENT_TYPE
+/** 
+MASK
+ */
     search_flags: number
     width: number
     height: number
@@ -1619,6 +1672,8 @@ declare class EntityDB {
     sound_killed_by_player: number
     sound_killed_by_other: number
     description: STRINGID
+    tilex: number
+    tiley: number
 }
 declare class Entity {
     type: EntityDB
@@ -1691,7 +1746,7 @@ Performs a teleport as if the entity had a teleporter and used it. The delta coo
 Triggers weapons and other held items like teleportter, mattock etc. You can check the [virtual-availability.md](virtual-availability.md), if entity has `open` in the `on_open` you can use this Callback, otherwise it does nothing. Returns false if action could not be performed (cooldown is not 0, no arrow loaded in etc. the animation could still be played thou)
  */
     trigger_action(user: Entity): boolean
-    get_metadata: any //unknown
+    get_metadata: any // &Entity::get_metadata
     apply_metadata(metadata: number): void
 }
 declare class Movable extends Entity {
@@ -1749,7 +1804,7 @@ airtime = falling_timer
     set_cursed(b: boolean): void
     drop: ((entity_to_drop: Entity) => {}) | boolean
     pick_up(entity_to_pick_up: Entity): void
-    can_jump(): boolean
+    can_jump: any // &Movable::can_jump
     standing_on(): Entity
 /** 
 Adds or subtracts the specified amount of money to the movable's (player's) inventory. Shows the calculation animation in the HUD.
@@ -1854,15 +1909,15 @@ Total money collected during previous levels (not the current one)
 /** 
 Types of gold/gems collected during this level, used later to display during the transition
  */
-    collected_money: Array<ENT_TYPE>
+    collected_money: FixedSizeArray<ENT_TYPE, 512>
 /** 
 Values of gold/gems collected during this level, used later to display during the transition
  */
-    collected_money_values: Array<number>
+    collected_money_values: FixedSizeArray<number, 512>
 /** 
 Types of enemies killed during this level, used later to display during the transition
  */
-    killed_enemies: Array<ENT_TYPE>
+    killed_enemies: FixedSizeArray<ENT_TYPE, 256>
 /** 
 Number of companions, it will determinate how many companions will be transfered to next level
 Increments when player acquires new companion, decrements when one of them dies
@@ -1872,38 +1927,38 @@ Increments when player acquires new companion, decrements when one of them dies
 Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    companions: Array<ENT_TYPE>
+    companions: FixedSizeArray<ENT_TYPE, 8>
 /** 
 Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    companion_held_items: Array<ENT_TYPE>
+    companion_held_items: FixedSizeArray<ENT_TYPE, 8>
 /** 
 Metadata of items held by companions (health, is cursed etc.)
 Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    companion_held_item_metadatas: Array<number>
+    companion_held_item_metadatas: FixedSizeArray<number, 8>
 /** 
 (0..3) Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    companion_trust: Array<number>
+    companion_trust: FixedSizeArray<number, 8>
 /** 
 Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    companion_health: Array<number>
+    companion_health: FixedSizeArray<number, 8>
 /** 
 Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    companion_poison_tick_timers: Array<number>
+    companion_poison_tick_timers: FixedSizeArray<number, 8>
 /** 
 Used to transfer information to transition/next level. Is not updated during a level
 You can use `ON.PRE_LEVEL_GENERATION` to access/edit this
  */
-    is_companion_cursed: Array<boolean>
+    is_companion_cursed: FixedSizeArray<boolean, 8>
 }
 declare class Ai {
     target: Entity
@@ -2034,6 +2089,10 @@ after triggering counts from 0 to 255, changes the 'phase_2' then counts from 0 
  */
     reset_timer: number
     phase_2: boolean
+/** 
+The uid must be movable entity for ownership transfers
+ */
+    trigger(who_uid: number): void
 }
 declare class SparkTrap extends Floor {
     emitted_light: Illumination
@@ -2120,7 +2179,7 @@ declare class MotherStatue extends Floor {
 /** 
 Table of player1_standing, player2_standing, ... etc.
  */
-    players_standing: Array<boolean>
+    players_standing: FixedSizeArray<boolean, 4>
     player1_standing: boolean
     player2_standing: boolean
     player3_standing: boolean
@@ -2128,7 +2187,7 @@ Table of player1_standing, player2_standing, ... etc.
 /** 
 Table of player1_health_received, player2_health_received, ... etc.
  */
-    players_health_received: Array<boolean>
+    players_health_received: FixedSizeArray<boolean, 4>
     player1_health_received: boolean
     player2_health_received: boolean
     player3_health_received: boolean
@@ -2136,7 +2195,7 @@ Table of player1_health_received, player2_health_received, ... etc.
 /** 
 Table of player1_health_timer, player2_health_timer, ... etc.
  */
-    players_health_timer: Array<number>
+    players_health_timer: FixedSizeArray<number, 4>
     player1_health_timer: number
     player2_health_timer: number
     player3_health_timer: number
@@ -3248,7 +3307,11 @@ declare class Telescope extends Movable {
 }
 declare class Torch extends Movable {
     flame_uid: number
+/** 
+It's used just to check, to light/extinguish use `light_up` Callback
+ */
     is_lit: boolean
+    light_up(lit: boolean): void
 }
 declare class WallTorch extends Torch {
 /** 
@@ -3401,6 +3464,9 @@ declare class CursedPot extends Movable {
     smoke2: ParticleEmitterInfo
 }
 declare class CookFire extends Movable {
+/** 
+Can set it on fire or extinguish
+ */
     lit: boolean
     emitted_light: Illumination
     particles_smoke: ParticleEmitterInfo
@@ -3471,7 +3537,7 @@ declare class PrizeDispenser extends Movable {
 Id's of the items (not types), by default 0-24, look at [change_diceshop_prizes](#change_diceshop_prizes) for the list of default prizes
 so for example: id 0 equals ITEM_PICKUP_BOMBBAG, id 1 equals ITEM_PICKUP_BOMBBOX etc. Game generates 6 but uses max 5 for Tusk dice shop
  */
-    item_ids: Array<number>
+    item_ids: FixedSizeArray<number, 6>
     prizes_spawned: number
 }
 declare class LiquidSurface extends Movable {
@@ -3973,6 +4039,128 @@ declare class ParticleEmitterInfo {
     offset_x: number
     offset_y: number
 }
+declare class ThemeInfo {
+    sub_theme: ThemeInfo
+    get_unknown1(): boolean
+    init_flags(): void
+    init_level(): void
+    unknown_v4(): void
+    unknown_v5(): void
+    add_special_rooms(): void
+    unknown_v7(): void
+    unknown_v8(): void
+    add_vault(): void
+    add_coffin(): void
+    add_special_feeling(): void
+    unknown_v12(): boolean
+    spawn_level(): void
+    spawn_border(): void
+    post_process_level(): void
+    spawn_traps(): void
+    post_process_entities(): void
+    spawn_procedural(): void
+    spawn_background(): void
+    spawn_lights(): void
+    spawn_transition(): void
+    post_transition(): void
+    spawn_players(): void
+    spawn_effects(): void
+    get_level_file(): string
+    get_theme_id(): number
+    get_base_id(): number
+    get_floor_spreading_type(): number
+    get_floor_spreading_type2(): number
+    unknown_v30(): boolean
+    get_transition_block_modifier(): number
+    unknown_v32(): number
+    get_backwall_type(): number
+    get_border_type(): number
+    get_critter_type(): number
+    get_liquid_gravity(): number
+    get_player_damage(): boolean
+    unknown_v38(): boolean
+    get_backlayer_lut(): number
+    get_backlayer_light_level(): number
+    get_loop(): boolean
+    get_vault_level(): number
+    get_unknown_1_or_2(index: number): boolean
+    get_dynamic_texture(texture_id: number): number
+    pre_transition(): void
+    get_level_height(): number
+    unknown_v47(): number
+    spawn_decoration(): void
+    spawn_decoration2(): void
+    spawn_extra(): void
+    unknown_v51(): void
+}
+declare class CustomTheme {
+    static new(theme_id_: number, base_theme_: number, defaults: boolean): CustomTheme
+    static new(theme_id_: number, base_theme_: number): CustomTheme
+    static new(): CustomTheme
+    level_file: string
+    theme: number
+    base_theme: number
+    sub_theme: any // &CustomTheme::sub_theme
+    textures: LuaTable<DYNAMIC_TEXTURE, number>
+    override: any // theme_override
+    pre(index: THEME_OVERRIDE, func_: Callback): void
+    post(index: THEME_OVERRIDE, func_: Callback): void
+    unknown1: any // &CustomTheme::unknown1
+    unknown2: any // &CustomTheme::unknown2
+    unknown3: any // &CustomTheme::unknown3
+    unknown4: any // &CustomTheme::unknown4
+    get_unknown1(): boolean
+    init_flags(): void
+    init_level(): void
+    unknown_v4(): void
+    unknown_v5(): void
+    add_special_rooms(): void
+    unknown_v7(): void
+    unknown_v8(): void
+    add_vault(): void
+    add_coffin(): void
+    add_special_feeling(): void
+    unknown_v12(): boolean
+    spawn_level(): void
+    spawn_border(): void
+    post_process_level(): void
+    spawn_traps(): void
+    post_process_entities(): void
+    spawn_procedural(): void
+    spawn_background(): void
+    spawn_lights(): void
+    spawn_transition(): void
+    post_transition(): void
+    spawn_players(): void
+    spawn_effects(): void
+    get_level_file(): string
+    get_theme_id(): number
+    get_base_id(): number
+    get_floor_spreading_type(): number
+    get_floor_spreading_type2(): number
+    unknown_v30(): boolean
+    get_transition_block_modifier(): number
+    unknown_v32(): number
+    get_backwall_type(): number
+    get_border_type(): number
+    get_critter_type(): number
+    get_liquid_gravity(): number
+    get_player_damage(): boolean
+    unknown_v38(): boolean
+    get_backlayer_lut(): number
+    get_backlayer_light_level(): number
+    get_loop(): boolean
+    get_vault_level(): number
+    get_unknown_1_or_2(index: number): boolean
+    get_dynamic_texture(texture_id: number): number
+    pre_transition(): void
+    get_level_height(): number
+    unknown_v47(): number
+    spawn_decoration(): void
+    spawn_decoration2(): void
+    spawn_extra(): void
+    unknown_v51(): void
+}
 declare class PreLoadLevelFilesContext {
 /** 
 Block all loading `.lvl` files and instead load the specified `.lvl` files. This includes `generic.lvl` so if you need it specify it here.
@@ -3993,12 +4181,14 @@ declare class DoorCoords {
     door2_y: number
 }
 declare class LevelGenSystem {
-    shop_type: number
+    shop_type: SHOP_TYPE
+    backlayer_shop_type: SHOP_TYPE
     spawn_x: number
     spawn_y: number
     spawn_room_x: number
     spawn_room_y: number
     exits: DoorCoords
+    themes: FixedSizeArray<ThemeInfo, 18>
 }
 declare class PostRoomGenerationContext {
 /** 
@@ -4018,6 +4208,10 @@ Marks the room as a set-room, a corresponding `setroomy-x` template must be load
 Unmarks the room as a set-room
  */
     unmark_as_set_room(x: number, y: number, layer: LAYER): boolean
+/** 
+Set the shop type for a specific room, does nothing if the room is not a shop
+ */
+    set_shop_type(x: number, y: number, layer: LAYER, shop_type: number): boolean
 /** 
 Force a spawn chance for this level, has the same restrictions as specifying the spawn chance in the .lvl file.
 Note that the actual chance to spawn is `1/inverse_chance` and that is also slightly skewed because of technical reasons.
@@ -4099,18 +4293,18 @@ declare class QuestsInfo {
     beg_state: number
 }
 declare class SaveData {
-    places: Array<boolean>
-    bestiary: Array<boolean>
-    people: Array<boolean>
-    items: Array<boolean>
-    traps: Array<boolean>
-    last_daily: any //unknown
+    places: FixedSizeArray<boolean, 16>
+    bestiary: FixedSizeArray<boolean, 78>
+    people: FixedSizeArray<boolean, 38>
+    items: FixedSizeArray<boolean, 54>
+    traps: FixedSizeArray<boolean, 24>
+    last_daily: string
     characters: number
     shortcuts: number
-    bestiary_killed: Array<number>
-    bestiary_killed_by: Array<number>
-    people_killed: Array<number>
-    people_killed_by: Array<number>
+    bestiary_killed: FixedSizeArray<number, 78>
+    bestiary_killed_by: FixedSizeArray<number, 78>
+    people_killed: FixedSizeArray<number, 38>
+    people_killed_by: FixedSizeArray<number, 38>
     plays: number
     deaths: number
     wins_normal: number
@@ -4123,8 +4317,8 @@ declare class SaveData {
     time_best: number
     time_total: number
     time_tutorial: number
-    character_deaths: Array<number>
-    pets_rescued: Array<number>
+    character_deaths: FixedSizeArray<number, 20>
+    pets_rescued: FixedSizeArray<number, 3>
     completed_normal: boolean
     completed_ironman: boolean
     completed_hard: boolean
@@ -4134,16 +4328,16 @@ declare class SaveData {
     level_last: number
     score_last: number
     time_last: number
-    stickers: Array<number>
-    players: Array<number>
+    stickers: FixedSizeArray<number, 20>
+    players: FixedSizeArray<number, 4>
     constellation: Constellation
 }
 declare class Constellation {
     star_count: number
-    stars: Array<ConstellationStar>
+    stars: FixedSizeArray<ConstellationStar, 45>
     scale: number
     line_count: number
-    lines: Array<ConstellationLine>
+    lines: FixedSizeArray<ConstellationLine, 90>
     line_red_intensity: number
 }
 declare class ConstellationStar {
@@ -4214,12 +4408,12 @@ declare class InputMapping {
     down: number
 }
 declare class PlayerInputs {
-    player_slots: Array<PlayerSlot>
+    player_slots: FixedSizeArray<PlayerSlot, MAX_PLAYERS>
     player_slot_1: PlayerSlot
     player_slot_2: PlayerSlot
     player_slot_3: PlayerSlot
     player_slot_4: PlayerSlot
-    player_settings: Array<PlayerSlotSettings>
+    player_settings: FixedSizeArray<PlayerSlotSettings, MAX_PLAYERS>
     player_slot_1_settings: PlayerSlotSettings
     player_slot_2_settings: PlayerSlotSettings
     player_slot_3_settings: PlayerSlotSettings
@@ -4357,42 +4551,40 @@ declare class ImVec2 {
     x: number
     y: number
 }
+declare class Gamepad {
+    enabled: boolean
+    buttons: any // &Gamepad::wButtons
+    lt: number
+    rt: number
+    lx: number
+    ly: number
+    rx: number
+    ry: number
+}
 declare class ImGuiIO {
     displaysize: ImVec2
     framerate: number
     wantkeyboard: boolean
-    /**
-    * array size: 512 
-    * Note: lua starts indexing at 1, you need `keysdown[string.byte('A') + 1]` to find the A key.
-    */
-    keysdown: Array<boolean>
-    keydown(key: number | string): boolean
-    keypressed(key: number | string, repeat?: boolean ): boolean
-    keyreleased(key: number | string): boolean
+    keysdown: FixedSizeArray<boolean       , 512>
+    keydown: any // keydown
+    keypressed: any // keypressed
+    keyreleased: any // keyreleased
     keyctrl: boolean
     keyshift: boolean
     keyalt: boolean
     keysuper: boolean
     wantmouse: boolean
     mousepos: ImVec2
-    /** array size: 5.
-    * Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Others buttons allows us to track if the mouse is being used by your application
-    */
-    mousedown: Array<boolean>
-    /** array size: 5.
-    * Mouse button went from !Down to Down
-    */
-    mouseclicked: Array<boolean>
-    /** array size: 5.
-    * Has mouse button been double-clicked?
-    */
-    mousedoubleclicked: Array<boolean>
+    mousedown: FixedSizeArray<boolean       , 5>
+    mouseclicked: FixedSizeArray<boolean       , 5>
+    mousedoubleclicked: FixedSizeArray<boolean       , 5>
     mousewheel: number
     gamepad: Gamepad
 }
 declare class VanillaRenderContext {
 /** 
-Draw text using the built-in renderer. Use in combination with ON.RENDER_✱ events. See vanilla_rendering.lua in the example scripts.
+Draw text using the built-in renderer
+Use in combination with ON.RENDER_✱ events. See vanilla_rendering.lua in the example scripts.
  */
     draw_text(text: string, x: number, y: number, scale_x: number, scale_y: number, color: Color, alignment: number, fontstyle: number): void
 /** 
@@ -4400,42 +4592,70 @@ Measure the provided text using the built-in renderer
  */
     draw_text_size(text: string, scale_x: number, scale_y: number, fontstyle: number): LuaMultiReturn<[number, number]>
 /** 
-Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
+Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer
+Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
  */
     draw_screen_texture(texture_id: TEXTURE, row: number, column: number, left: number, top: number, right: number, bottom: number, color: Color): void
 /** 
-Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
+Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer
+Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
  */
     draw_screen_texture(texture_id: TEXTURE, row: number, column: number, rect: AABB, color: Color): void
 /** 
-Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
+Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer with angle, px/py is pivot for the rotatnion where 0,0 is center 1,1 is top right corner etc.
+Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
+ */
+    draw_screen_texture(texture_id: TEXTURE, row: number, column: number, rect: AABB, color: Color, angle: number, px: number, py: number): void
+/** 
+Draw a texture in screen coordinates from top-left to bottom-right using the built-in renderer
+Use in combination with ON.RENDER_✱_HUD/PAUSE_MENU/JOURNAL_PAGE events
+ */
+    draw_screen_texture(texture_id: TEXTURE, row: number, column: number, dest: Quad, color: Color): void
+/** 
+Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer
+Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
  */
     draw_world_texture(texture_id: TEXTURE, row: number, column: number, left: number, top: number, right: number, bottom: number, color: Color): void
 /** 
-Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer. Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
+Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer
+Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
  */
     draw_world_texture(texture_id: TEXTURE, row: number, column: number, rect: AABB, color: Color): void
+/** 
+Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer with angle, px/py is pivot for the rotatnion where 0,0 is center 1,1 is top right corner etc.
+Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
+ */
+    draw_world_texture(texture_id: TEXTURE, row: number, column: number, rect: AABB, color: Color, angle: number, px: number, py: number): void
+/** 
+Draw a texture in world coordinates from top-left to bottom-right using the built-in renderer
+Use in combination with ON.RENDER_PRE_DRAW_DEPTH event
+ */
+    draw_world_texture(texture_id: TEXTURE, row: number, column: number, dest: Quad, color: Color): void
 }
 declare class TextureRenderingInfo {
     x: number
     y: number
-    destination_top_left_x: number
-    destination_top_left_y: number
-    destination_top_right_x: number
-    destination_top_right_y: number
     destination_bottom_left_x: number
     destination_bottom_left_y: number
     destination_bottom_right_x: number
     destination_bottom_right_y: number
+    destination_top_left_x: number
+    destination_top_left_y: number
+    destination_top_right_x: number
+    destination_top_right_y: number
     set_destination(bbox: AABB): void
-    source_top_left_x: number
-    source_top_left_y: number
-    source_top_right_x: number
-    source_top_right_y: number
+    dest_get_quad(): Quad
+    dest_set_quad(quad: Quad): void
     source_bottom_left_x: number
     source_bottom_left_y: number
     source_bottom_right_x: number
     source_bottom_right_y: number
+    source_top_left_x: number
+    source_top_left_y: number
+    source_top_right_x: number
+    source_top_right_y: number
+    source_get_quad(): Quad
+    source_set_quad(quad: Quad): void
 }
 declare class TextRenderingInfo {
     x: number
@@ -4504,6 +4724,29 @@ Short for `aabb.top - aabb.bottom`.
  */
     height(): number
 }
+declare class Quad {
+    static new(): Quad
+    static new(Quad: Quad): Quad
+    static new(_bottom_left_x: number, _bottom_left_y: number, _bottom_right_x: number, _bottom_right_y: number, _top_right_x: number, _top_right_y: number, _top_left_x: number, _top_left_y: number): Quad
+    static new(AABB: AABB): Quad
+    bottom_left_x: number
+    bottom_left_y: number
+    bottom_right_x: number
+    bottom_right_y: number
+    top_right_x: number
+    top_right_y: number
+    top_left_x: number
+    top_left_y: number
+/** 
+Returns the max/min values of the Quad
+ */
+    get_AABB(): AABB
+    offset(off_x: number, off_y: number): Quad
+/** 
+Rotates a Quad by an angle, px/py are not offsets, use `:get_AABB():center()` to get approximated center for simetrical quadrangle
+ */
+    rotate(angle: number, px: number, py: number): Quad
+}
 declare class Screen {
     render_timer: number
 }
@@ -4553,8 +4796,8 @@ declare class ScreenMenu extends Screen {
     cthulhu_timer: number
     selected_menu_index: number
     menu_text_opacity: number
-    spear_position: Array<number>
-    spear_dangler: Array<SpearDanglerAnimFrames>
+    spear_position: FixedSizeArray<number, 6>
+    spear_dangler: FixedSizeArray<SpearDanglerAnimFrames, 6>
     play_scroll_descend_timer: number
     scroll_text: STRINGID
 }
@@ -4646,15 +4889,15 @@ declare class ScreenCharacterSelect extends Screen {
     quick_select_panel: TextureRenderingInfo
     quick_select_selected_char_background: TextureRenderingInfo
     quick_select_panel_related: TextureRenderingInfo
-    player_shutter_timer: Array<number>
-    player_x: Array<number>
-    player_y: Array<number>
-    player_arrow_slidein_timer: Array<Array<number>>
-    player_facing_left: Array<boolean>
-    player_quickselect_shown: Array<boolean>
-    player_quickselect_fadein_timer: Array<number>
-    player_quickselect_coords: Array<Array<number>>
-    player_quickselect_wiggle_angle: Array<number>
+    player_shutter_timer: FixedSizeArray<number, MAX_PLAYERS>
+    player_x: FixedSizeArray<number, MAX_PLAYERS>
+    player_y: FixedSizeArray<number, MAX_PLAYERS>
+    player_arrow_slidein_timer: FixedSizeArray<FixedSizeArray<number, 2>, MAX_PLAYERS>
+    player_facing_left: FixedSizeArray<boolean, MAX_PLAYERS>
+    player_quickselect_shown: FixedSizeArray<boolean, MAX_PLAYERS>
+    player_quickselect_fadein_timer: FixedSizeArray<number, MAX_PLAYERS>
+    player_quickselect_coords: FixedSizeArray<FixedSizeArray<number, 2>, MAX_PLAYERS>
+    player_quickselect_wiggle_angle: FixedSizeArray<number, MAX_PLAYERS>
     topleft_woodpanel_esc_slidein_timer: number
     start_panel_slidein_timer: number
     action_buttons_keycap_size: number
@@ -4665,7 +4908,7 @@ declare class ScreenCharacterSelect extends Screen {
     opacity: number
     start_pressed: boolean
     transition_to_game_started: boolean
-    flying_things: Array<FlyingThing>
+    flying_things: FixedSizeArray<FlyingThing, 6>
     flying_thing_countdown: number
     particle_ceilingdust_smoke: ParticleEmitterInfo
     particle_ceilingdust_rubble: ParticleEmitterInfo
@@ -4751,11 +4994,11 @@ declare class ScreenTransition extends Screen {
     woodpanel_cutout_big_money3: TextureRenderingInfo
     big_dollar_sign: TextureRenderingInfo
     unknown26: TextureRenderingInfo
-    player_stats_scroll_numeric_value: Array<number>
-    player_secondary_icon: Array<TextureRenderingInfo>
-    player_icon: Array<TextureRenderingInfo>
-    player_secondary_icon_type: Array<number>
-    player_icon_index: Array<number>
+    player_stats_scroll_numeric_value: FixedSizeArray<number, MAX_PLAYERS>
+    player_secondary_icon: FixedSizeArray<TextureRenderingInfo, MAX_PLAYERS>
+    player_icon: FixedSizeArray<TextureRenderingInfo, MAX_PLAYERS>
+    player_secondary_icon_type: FixedSizeArray<number, MAX_PLAYERS>
+    player_icon_index: FixedSizeArray<number, MAX_PLAYERS>
     hourglasses: TextureRenderingInfo
     small_dollar_signs: TextureRenderingInfo
     this_level_money_color: Color
@@ -4806,7 +5049,7 @@ declare class ScreenOnlineLobby extends Screen {
     woodpanel_top_visible: boolean
     woodpanel_bottom_visible: boolean
     toggle_panels_slidein: boolean
-    players: Array<OnlineLobbyScreenPlayer>
+    players: FixedSizeArray<OnlineLobbyScreenPlayer, 4>
     background_image: TextureRenderingInfo
     topleft_woodpanel_esc: TextureRenderingInfo
     topleft_woodpanel_esc_slidein_timer: number
@@ -4972,7 +5215,7 @@ declare class JournalPageLastGamePlayed extends JournalPage {
     time_text_info: TextRenderingInfo
     time_value_text_info: TextRenderingInfo
     sticker_count: number
-    stickers: Array<TextureRenderingInfo>
+    stickers: FixedSizeArray<TextureRenderingInfo, 20>
 }
 declare class ScreenArenaMenu extends Screen {
     brick_background_animation: ScreenZoomAnimation
@@ -5144,16 +5387,16 @@ declare class ScreenArenaScore extends Screen {
     score_counter: TextureRenderingInfo
     unknown27: TextureRenderingInfo
     lava_bubbles: TextureRenderingInfo
-    player_won: Array<boolean>
+    player_won: FixedSizeArray<boolean, MAX_PLAYERS>
     victory_jump_y_pos: number
     victory_jump_velocity: number
     animation_frame: number
     squash_and_celebrate: boolean
-    player_ready: Array<boolean>
+    player_ready: FixedSizeArray<boolean, MAX_PLAYERS>
     next_transition_timer: number
-    player_bottom_pillar_offset: Array<number>
-    player_crushing_pillar_height: Array<number>
-    player_create_giblets: Array<boolean>
+    player_bottom_pillar_offset: FixedSizeArray<number, MAX_PLAYERS>
+    player_crushing_pillar_height: FixedSizeArray<number, MAX_PLAYERS>
+    player_create_giblets: FixedSizeArray<boolean, MAX_PLAYERS>
     next_sidepanel_slidein_timer: number
 }
 
@@ -5221,12 +5464,13 @@ declare enum COSUBTHEME {
   VOLCANA = 2
 }
 declare enum DROP {
-  ALIENQUEEN_ALIENBLAST = 178,
-  ALIENQUEEN_ALIENBLAST_RE = 180,
-  ALIENQUEEN_ALIENBLAST_RI = 179,
+  ALIENQUEEN_ALIENBLAST = 182,
+  ALIENQUEEN_ALIENBLAST_RE = 184,
+  ALIENQUEEN_ALIENBLAST_RI = 183,
   ALTAR_DICE_CLIMBINGGLOVES = 0,
   ALTAR_DICE_COOKEDTURKEY = 1,
   ALTAR_DICE_DIAMOND = 2,
+  ALTAR_DICE_HIREDHAND = 10,
   ALTAR_DICE_MACHETE = 3,
   ALTAR_DICE_ROPEPILE = 4,
   ALTAR_DICE_SNAKE = 6,
@@ -5234,182 +5478,185 @@ declare enum DROP {
   ALTAR_DICE_TELEPACK = 7,
   ALTAR_DICE_VAMPIRE = 8,
   ALTAR_DICE_WEBGUN = 9,
-  ALTAR_IDOL_GOLDEN_MONKEY = 10,
-  ALTAR_KAPALA = 11,
-  ALTAR_PRESENT_EGGPLANT = 12,
-  ALTAR_ROCK_WOODENARROW = 13,
-  ALTAR_ROYAL_JELLY = 14,
-  ALTAR_USHABTI_CAVEMAN = 15,
-  ALTAR_USHABTI_TURKEY = 16,
-  ALTAR_USHABTI_VAMPIRE = 17,
-  ANUBIS2_ANUBIS_COFFIN = 153,
-  ANUBIS2_JETPACK = 18,
-  ANUBIS2_SPECIALSHOT_R = 183,
-  ANUBIS_COFFIN_SORCERESS = 105,
-  ANUBIS_COFFIN_VAMPIRE = 104,
-  ANUBIS_COFFIN_WITCHDOCTOR = 106,
-  ANUBIS_SCEPTER = 19,
-  ANUBIS_SPECIALSHOT_R = 182,
-  ARROWTRAP_WOODENARROW = 150,
-  AXOLOTL_BUBBLE = 171,
-  BEG_BOMBBAG = 20,
-  BEG_TELEPACK = 22,
-  BEG_TRUECROWN = 21,
-  BONEPILE_SKELETONKEY = 23,
-  BONEPILE_SKULL = 24,
-  CANDLE_NUGGET = 144,
-  CATMUMMY_CURSINGCLOUD = 181,
-  CATMUMMY_DIAMOND = 116,
-  CHEST_BOMB = 135,
-  CHEST_EMERALD = 130,
-  CHEST_LEPRECHAUN = 134,
-  CHEST_RUBY = 132,
-  CHEST_SAPPHIRE = 131,
-  CHEST_SMALLEMERALD = 129,
-  CHEST_SMALLRUBY = 133,
-  CLONEGUN_SHOT = 163,
-  COBRA_ACIDSPIT = 174,
-  COFFIN_SKULL = 147,
-  COOKEDTURKEY_HEALTH = 185,
-  COOKFIRE_TORCH = 145,
-  CROCMAN_TELEPACK = 25,
-  CROCMAN_TELEPORTER = 26,
-  CRUSHTRAP_NUGGET = 126,
-  CUTSCENE_GOLDCOIN = 142,
-  DUATALTAR_BOMBBAG = 122,
-  DUATALTAR_BOMBBOX = 123,
-  DUATALTAR_COOKEDTURKEY = 124,
-  EGGSAC_GRUB_1 = 109,
-  EGGSAC_GRUB_2 = 110,
-  EGGSAC_GRUB_3 = 111,
-  EMBED_NUGGET = 128,
-  FACTORY_GENERATOR_SCRAP = 88,
-  FIREBUG_FIREBALL = 173,
-  FLOORSTYLEDCOG_NUGGET = 125,
-  FREEZERAY_SHOT = 162,
-  GHIST_GOLDCOIN = 58,
-  GHOSTJAR_DIAMOND = 27,
-  GHOST_DIAMOND = 28,
-  GIANTFOOD_HEALTH = 186,
-  GIANTFROG_FROG = 107,
-  GIANTFROG_TADPOLE = 108,
-  GIANTSPIDER_PASTE = 29,
-  GIANTSPIDER_WEBSHOT = 155,
-  GOLDENMONKEY_NUGGET = 33,
-  GOLDENMONKEY_SMALLEMERALD = 30,
-  GOLDENMONKEY_SMALLRUBY = 32,
-  GOLDENMONKEY_SMALLSAPPHIRE = 31,
-  HANGINGSPIDER_WEBGUN = 34,
-  HERMITCRAB_ACIDBUBBLE = 176,
-  HUMPHEAD_HIREDHAND = 117,
-  HUNDUN_FIREBALL = 172,
-  ICECAVE_BOULDER = 35,
-  JIANGSHIASSASSIN_SPIKESHOES = 36,
-  JIANGSHI_SPRINGSHOES = 37,
-  KAPALA_HEALTH = 188,
-  KINGU_FEMALE_JIANGSHI = 41,
-  KINGU_JIANGSHI = 40,
-  KINGU_OCTOPUS = 39,
-  KINGU_TABLETOFDESTINY = 38,
-  LAMASSU_DIAMOND = 121,
-  LAMASSU_EMERALD = 120,
-  LAMASSU_LASERSHOT = 166,
-  LAMASSU_RUBY = 119,
-  LAMASSU_SAPPHIRE = 118,
-  LASERTRAP_SHOT = 152,
-  LAVAMANDER_RUBY = 115,
-  LAVAPOT_MAGMAMAN = 114,
-  LEPRECHAUN_CLOVER = 42,
-  LOCKEDCHEST_UDJATEYE = 139,
-  MADAME_TUSK_KEY = 103,
-  MATTOCK_BROKENMATTOCK = 43,
-  MOLE_MATTOCK = 44,
-  MOSQUITO_HOVERPACK = 45,
-  MOTHERSTATUE_HEALTH = 184,
-  MUMMY_DIAMOND = 46,
-  MUMMY_FLY = 154,
-  NECROMANCER_RUBY = 47,
-  OCTOPUS_INKSPIT = 175,
-  OLMEC_BOMB = 156,
-  OLMEC_CAVEMAN_1 = 48,
-  OLMEC_CAVEMAN_2 = 49,
-  OLMEC_CAVEMAN_3 = 50,
-  OLMEC_SISTERS_BOMBBOX = 149,
-  OLMEC_SISTERS_ROPEPILE = 148,
-  OLMEC_UFO = 157,
-  OSIRIS_EMERALDS = 51,
-  OSIRIS_PORTAL = 53,
-  OSIRIS_TABLETOFDESTINY = 52,
-  PANGXIE_ACIDBUBBLE = 177,
-  PANGXIE_WOODENSHIELD = 54,
-  PLASMACANNON_SHOT = 161,
-  POISONEDARROWTRAP_WOODENARROW = 151,
-  POTOFGOLD_GOLDCOIN = 141,
-  QILIN_FIREBALL = 170,
-  QUEENBEE_ROYALJELLY = 55,
-  QUILLBACK_BOMBBAG = 112,
-  QUILLBACK_COOKEDTURKEY = 113,
-  REDLANTERN_SMALLNUGGET = 143,
-  ROBOT_METALSHIELD = 56,
-  ROCKDOG_FIREBALL = 169,
-  ROYALJELLY_HEALTH = 187,
-  SACRIFICE_EGGPLANT = 99,
-  SACRIFICE_IDOL = 96,
-  SACRIFICE_PRESENT = 97,
-  SACRIFICE_ROCK = 98,
-  SCEPTER_ANUBISSPECIALSHOT = 159,
-  SCEPTER_PLAYERSHOT = 160,
-  SCRAP_ALIEN = 94,
-  SCRAP_COBRA = 92,
-  SCRAP_SCORPION = 93,
-  SCRAP_SNAKE = 91,
-  SCRAP_SPIDER = 90,
-  SHOPKEEPER_GENERATOR_1 = 89,
-  SHOPKEEPER_GOLDCOIN = 57,
-  SHOTGUN_BULLET = 164,
-  SKELETON_SKELETONKEY = 59,
-  SKELETON_SKULL = 60,
-  SKULLDROPTRAP_SKULL = 146,
-  SLIDINGWALL_NUGGET = 127,
-  SORCERESS_DAGGERSHOT = 167,
-  SORCERESS_RUBY = 61,
-  SPARROW_ROPEPILE = 62,
-  SPARROW_SKELETONKEY = 63,
-  TIAMAT_BAT = 64,
-  TIAMAT_BEE = 65,
-  TIAMAT_CAVEMAN = 66,
-  TIAMAT_COBRA = 67,
-  TIAMAT_HERMITCRAB = 68,
-  TIAMAT_MONKEY = 69,
-  TIAMAT_MOSQUITO = 70,
-  TIAMAT_OCTOPUS = 71,
-  TIAMAT_OLMITE = 72,
-  TIAMAT_SCORPION = 73,
-  TIAMAT_SHOT = 74,
-  TIAMAT_SNAKE = 75,
-  TIAMAT_TIAMATSHOT = 168,
-  TIAMAT_UFO = 76,
-  TIAMAT_YETI = 77,
-  TORCH_SMALLNUGGET = 78,
-  TURKEY_COOKEDTURKEY = 79,
-  UFO_ALIEN = 95,
-  UFO_LASERSHOT = 165,
-  UFO_PARACHUTE = 80,
-  USHABTI_QILIN = 140,
-  VAMPIRE_CAPE = 81,
-  VAN_HORSING_COMPASS = 82,
-  VAN_HORSING_DIAMOND = 83,
-  VAULTCHEST_DIAMOND = 137,
-  VAULTCHEST_EMERALD = 136,
-  VAULTCHEST_RUBY = 138,
-  VLAD_VLADSCAPE = 84,
-  YAMA_EGGPLANTCROWN = 100,
-  YAMA_GIANTFOOD = 101,
-  YANG_KEY = 102,
-  YETIKING_FREEZERAY = 85,
-  YETIKING_ICESPIRE = 158,
-  YETIQUEEN_POWERPACK = 86,
-  YETI_PITCHERSMITT = 87
+  ALTAR_GIFT_BOMBBAG = 21,
+  ALTAR_HIREDHAND_SHOTGUN = 20,
+  ALTAR_IDOL_GOLDEN_MONKEY = 11,
+  ALTAR_KAPALA = 12,
+  ALTAR_PRESENT_EGGPLANT = 13,
+  ALTAR_ROCK_WOODENARROW = 14,
+  ALTAR_ROYAL_JELLY = 15,
+  ALTAR_USHABTI_CAVEMAN = 16,
+  ALTAR_USHABTI_HIREDHAND = 19,
+  ALTAR_USHABTI_TURKEY = 17,
+  ALTAR_USHABTI_VAMPIRE = 18,
+  ANUBIS2_ANUBIS_COFFIN = 157,
+  ANUBIS2_JETPACK = 22,
+  ANUBIS2_SPECIALSHOT_R = 187,
+  ANUBIS_COFFIN_SORCERESS = 109,
+  ANUBIS_COFFIN_VAMPIRE = 108,
+  ANUBIS_COFFIN_WITCHDOCTOR = 110,
+  ANUBIS_SCEPTER = 23,
+  ANUBIS_SPECIALSHOT_R = 186,
+  ARROWTRAP_WOODENARROW = 154,
+  AXOLOTL_BUBBLE = 175,
+  BEG_BOMBBAG = 24,
+  BEG_TELEPACK = 26,
+  BEG_TRUECROWN = 25,
+  BONEPILE_SKELETONKEY = 27,
+  BONEPILE_SKULL = 28,
+  CANDLE_NUGGET = 148,
+  CATMUMMY_CURSINGCLOUD = 185,
+  CATMUMMY_DIAMOND = 120,
+  CHEST_BOMB = 139,
+  CHEST_EMERALD = 134,
+  CHEST_LEPRECHAUN = 138,
+  CHEST_RUBY = 136,
+  CHEST_SAPPHIRE = 135,
+  CHEST_SMALLEMERALD = 133,
+  CHEST_SMALLRUBY = 137,
+  CLONEGUN_SHOT = 167,
+  COBRA_ACIDSPIT = 178,
+  COFFIN_SKULL = 151,
+  COOKEDTURKEY_HEALTH = 189,
+  COOKFIRE_TORCH = 149,
+  CROCMAN_TELEPACK = 29,
+  CROCMAN_TELEPORTER = 30,
+  CRUSHTRAP_NUGGET = 130,
+  CUTSCENE_GOLDCOIN = 146,
+  DUATALTAR_BOMBBAG = 126,
+  DUATALTAR_BOMBBOX = 127,
+  DUATALTAR_COOKEDTURKEY = 128,
+  EGGSAC_GRUB_1 = 113,
+  EGGSAC_GRUB_2 = 114,
+  EGGSAC_GRUB_3 = 115,
+  EMBED_NUGGET = 132,
+  FACTORY_GENERATOR_SCRAP = 92,
+  FIREBUG_FIREBALL = 177,
+  FLOORSTYLEDCOG_NUGGET = 129,
+  FREEZERAY_SHOT = 166,
+  GHIST_GOLDCOIN = 62,
+  GHOSTJAR_DIAMOND = 31,
+  GHOST_DIAMOND = 32,
+  GIANTFOOD_HEALTH = 190,
+  GIANTFROG_FROG = 111,
+  GIANTFROG_TADPOLE = 112,
+  GIANTSPIDER_PASTE = 33,
+  GIANTSPIDER_WEBSHOT = 159,
+  GOLDENMONKEY_NUGGET = 37,
+  GOLDENMONKEY_SMALLEMERALD = 34,
+  GOLDENMONKEY_SMALLRUBY = 36,
+  GOLDENMONKEY_SMALLSAPPHIRE = 35,
+  HANGINGSPIDER_WEBGUN = 38,
+  HERMITCRAB_ACIDBUBBLE = 180,
+  HUMPHEAD_HIREDHAND = 121,
+  HUNDUN_FIREBALL = 176,
+  ICECAVE_BOULDER = 39,
+  JIANGSHIASSASSIN_SPIKESHOES = 40,
+  JIANGSHI_SPRINGSHOES = 41,
+  KAPALA_HEALTH = 192,
+  KINGU_FEMALE_JIANGSHI = 45,
+  KINGU_JIANGSHI = 44,
+  KINGU_OCTOPUS = 43,
+  KINGU_TABLETOFDESTINY = 42,
+  LAMASSU_DIAMOND = 125,
+  LAMASSU_EMERALD = 124,
+  LAMASSU_LASERSHOT = 170,
+  LAMASSU_RUBY = 123,
+  LAMASSU_SAPPHIRE = 122,
+  LASERTRAP_SHOT = 156,
+  LAVAMANDER_RUBY = 119,
+  LAVAPOT_MAGMAMAN = 118,
+  LEPRECHAUN_CLOVER = 46,
+  LOCKEDCHEST_UDJATEYE = 143,
+  MADAME_TUSK_KEY = 107,
+  MATTOCK_BROKENMATTOCK = 47,
+  MOLE_MATTOCK = 48,
+  MOSQUITO_HOVERPACK = 49,
+  MOTHERSTATUE_HEALTH = 188,
+  MUMMY_DIAMOND = 50,
+  MUMMY_FLY = 158,
+  NECROMANCER_RUBY = 51,
+  OCTOPUS_INKSPIT = 179,
+  OLMEC_BOMB = 160,
+  OLMEC_CAVEMAN_1 = 52,
+  OLMEC_CAVEMAN_2 = 53,
+  OLMEC_CAVEMAN_3 = 54,
+  OLMEC_SISTERS_BOMBBOX = 153,
+  OLMEC_SISTERS_ROPEPILE = 152,
+  OLMEC_UFO = 161,
+  OSIRIS_EMERALDS = 55,
+  OSIRIS_PORTAL = 57,
+  OSIRIS_TABLETOFDESTINY = 56,
+  PANGXIE_ACIDBUBBLE = 181,
+  PANGXIE_WOODENSHIELD = 58,
+  PLASMACANNON_SHOT = 165,
+  POISONEDARROWTRAP_WOODENARROW = 155,
+  POTOFGOLD_GOLDCOIN = 145,
+  QILIN_FIREBALL = 174,
+  QUEENBEE_ROYALJELLY = 59,
+  QUILLBACK_BOMBBAG = 116,
+  QUILLBACK_COOKEDTURKEY = 117,
+  REDLANTERN_SMALLNUGGET = 147,
+  ROBOT_METALSHIELD = 60,
+  ROCKDOG_FIREBALL = 173,
+  ROYALJELLY_HEALTH = 191,
+  SACRIFICE_EGGPLANT = 103,
+  SACRIFICE_IDOL = 100,
+  SACRIFICE_PRESENT = 101,
+  SACRIFICE_ROCK = 102,
+  SCEPTER_ANUBISSPECIALSHOT = 163,
+  SCEPTER_PLAYERSHOT = 164,
+  SCRAP_ALIEN = 98,
+  SCRAP_COBRA = 96,
+  SCRAP_SCORPION = 97,
+  SCRAP_SNAKE = 95,
+  SCRAP_SPIDER = 94,
+  SHOPKEEPER_GENERATOR_1 = 93,
+  SHOPKEEPER_GOLDCOIN = 61,
+  SHOTGUN_BULLET = 168,
+  SKELETON_SKELETONKEY = 63,
+  SKELETON_SKULL = 64,
+  SKULLDROPTRAP_SKULL = 150,
+  SLIDINGWALL_NUGGET = 131,
+  SORCERESS_DAGGERSHOT = 171,
+  SORCERESS_RUBY = 65,
+  SPARROW_ROPEPILE = 66,
+  SPARROW_SKELETONKEY = 67,
+  TIAMAT_BAT = 68,
+  TIAMAT_BEE = 69,
+  TIAMAT_CAVEMAN = 70,
+  TIAMAT_COBRA = 71,
+  TIAMAT_HERMITCRAB = 72,
+  TIAMAT_MONKEY = 73,
+  TIAMAT_MOSQUITO = 74,
+  TIAMAT_OCTOPUS = 75,
+  TIAMAT_OLMITE = 76,
+  TIAMAT_SCORPION = 77,
+  TIAMAT_SHOT = 78,
+  TIAMAT_SNAKE = 79,
+  TIAMAT_TIAMATSHOT = 172,
+  TIAMAT_UFO = 80,
+  TIAMAT_YETI = 81,
+  TORCH_SMALLNUGGET = 82,
+  TURKEY_COOKEDTURKEY = 83,
+  UFO_ALIEN = 99,
+  UFO_LASERSHOT = 169,
+  UFO_PARACHUTE = 84,
+  USHABTI_QILIN = 144,
+  VAMPIRE_CAPE = 85,
+  VAN_HORSING_COMPASS = 86,
+  VAN_HORSING_DIAMOND = 87,
+  VAULTCHEST_DIAMOND = 141,
+  VAULTCHEST_EMERALD = 140,
+  VAULTCHEST_RUBY = 142,
+  VLAD_VLADSCAPE = 88,
+  YAMA_EGGPLANTCROWN = 104,
+  YAMA_GIANTFOOD = 105,
+  YANG_KEY = 106,
+  YETIKING_FREEZERAY = 89,
+  YETIKING_ICESPIRE = 162,
+  YETIQUEEN_POWERPACK = 90,
+  YETI_PITCHERSMITT = 91
 }
 declare enum DROPCHANCE {
   BONEBLOCK_SKELETONKEY = 0,
@@ -5423,6 +5670,16 @@ declare enum DROPCHANCE {
   SKELETON_SKELETONKEY = 8,
   UFO_PARACHUTE = 9,
   YETI_PITCHERSMITT = 10
+}
+declare enum DYNAMIC_TEXTURE {
+  BACKGROUND = -4,
+  BACKGROUND_DECORATION = -8,
+  COFFIN = -10,
+  DOOR = -6,
+  DOOR_LAYER = -7,
+  FLOOR = -5,
+  INVISIBLE = -2,
+  KALI_STATUE = -9
 }
 declare enum ENT_FLAG {
   CAN_BE_STOMPED = 15,
@@ -6789,6 +7046,13 @@ declare enum LEVEL_CONFIG {
   MAX_LIQUID_PARTICLES = 15,
   MOUNT_CHANCE = 4
 }
+declare enum LIQUID_POOL {
+  COARSE_LAVA = 4,
+  COARSE_WATER = 2,
+  LAVA = 3,
+  STAGNANT_LAVA = 5,
+  WATER = 1
+}
 declare enum MASK {
   ACTIVEFLOOR = 128,
   ANY = 0,
@@ -7477,12 +7741,17 @@ declare enum SCREEN {
   WIN = 16
 }
 declare enum SHOP_TYPE {
+  CAVEMAN_SHOP = 10,
   CLOTHING_SHOP = 1,
+  CURIO_SHOP = 9,
   DICE_SHOP = 6,
   GENERAL_STORE = 0,
+  GHIST_SHOP = 12,
+  HEDJET_SHOP = 8,
   HIRED_HAND_SHOP = 4,
   PET_SHOP = 5,
   SPECIALTY_SHOP = 3,
+  TURKEY_SHOP = 11,
   TUSK_DICE_SHOP = 13,
   WEAPON_SHOP = 2
 }
@@ -7938,47 +8207,102 @@ declare enum THEME {
   TIDE_POOL = 5,
   VOLCANA = 3
 }
+declare enum THEME_OVERRIDE {
+  BACKLAYER_LIGHT_LEVEL = 40,
+  BASE = 0,
+  BASE_ID = 27,
+  COFFIN = 10,
+  ENT_BACKWALL = 33,
+  ENT_BORDER = 34,
+  ENT_CRITTER = 35,
+  ENT_FLOOR_SPREADING = 28,
+  ENT_FLOOR_SPREADING2 = 29,
+  FEELING = 11,
+  GET_UNKNOWN1_OR_2 = 43,
+  GRAVITY = 36,
+  INIT_FLAGS = 2,
+  INIT_LEVEL = 3,
+  LEVEL_HEIGHT = 46,
+  LOOP = 41,
+  LVL_FILE = 25,
+  PLAYER_DAMAGE = 37,
+  POST_PROCESS_ENTITIES = 17,
+  POST_PROCESS_LEVEL = 15,
+  POST_TRANSITION = 22,
+  PRE_TRANSITION = 45,
+  SPAWN_BACKGROUND = 19,
+  SPAWN_BORDER = 14,
+  SPAWN_DECORATION = 48,
+  SPAWN_DECORATION2 = 49,
+  SPAWN_EFFECTS = 24,
+  SPAWN_EXTRA = 50,
+  SPAWN_LEVEL = 13,
+  SPAWN_LIGHTS = 20,
+  SPAWN_PLAYERS = 23,
+  SPAWN_PROCEDURAL = 18,
+  SPAWN_TRANSITION = 21,
+  SPAWN_TRAPS = 16,
+  SPECIAL_ROOMS = 6,
+  TEXTURE_BACKLAYER_LUT = 39,
+  TEXTURE_DYNAMIC = 44,
+  THEME_ID = 26,
+  TRANSITION_MODIFIER = 31,
+  UNKNOWN_V1 = 1,
+  UNKNOWN_V4 = 4,
+  UNKNOWN_V5 = 5,
+  UNKNOWN_V7 = 7,
+  UNKNOWN_V8 = 8,
+  UNKNOWN_V12 = 12,
+  UNKNOWN_V30 = 30,
+  UNKNOWN_V32 = 32,
+  UNKNOWN_V38 = 38,
+  UNKNOWN_V47 = 47,
+  UNKNOWN_V51 = 51,
+  VAULT = 9,
+  VAULT_LEVEL = 42
+}
 declare enum TILE_CODE {
   ADJACENT_FLOOR = 29,
   ALIEN = 148,
   ALIENQUEEN = 154,
   ALIEN_GENERATOR = 156,
   ALTAR = 185,
-  ALTAR_DUAT = 338,
+  ALTAR_DUAT = 341,
   AMMIT = 174,
   ANKH = 197,
   ANUBIS = 130,
-  ANUBIS2 = 250,
-  APEP = 375,
-  APEP_LEFT = 376,
-  APEP_RIGHT = 377,
+  ANUBIS2 = 253,
+  APEP = 379,
+  APEP_LEFT = 380,
+  APEP_RIGHT = 381,
   ARROW_TRAP = 55,
-  ASSASSIN = 251,
+  ASSASSIN = 254,
   AUTOWALLTORCH = 100,
   BABYLON_FLOOR = 18,
-  BACK_HOVERPACK = 308,
-  BACK_JETPACK = 306,
-  BACK_POWERPACK = 309,
-  BACK_TELEPACK = 307,
+  BACK_HOVERPACK = 311,
+  BACK_JETPACK = 309,
+  BACK_POWERPACK = 312,
+  BACK_TELEPACK = 310,
   BAT = 241,
-  BEE = 254,
+  BAT_FLYING = 242,
+  BEE = 257,
   BEEHIVE_FLOOR = 21,
-  BEE_QUEEN = 255,
+  BEE_QUEEN = 258,
   BIGSPEAR_TRAP = 176,
   BODYGUARD = 230,
-  BOMB = 282,
-  BOMB_BAG = 280,
-  BOMB_BOX = 281,
+  BOMB = 285,
+  BOMB_BAG = 283,
+  BOMB_BOX = 284,
   BONE_BLOCK = 6,
-  BONE_KEY = 302,
-  BOOMBOX = 388,
-  BOOMERANG = 315,
-  BOULDER = 374,
-  BUBBLE_PLATFORM = 365,
+  BONE_KEY = 305,
+  BOOMBOX = 392,
+  BOOMERANG = 318,
+  BOULDER = 378,
+  BUBBLE_PLATFORM = 369,
   BUNKBED = 75,
   BUSH_BLOCK = 7,
-  CAMERA = 313,
-  CAPE = 304,
+  CAMERA = 316,
+  CAPE = 307,
   CATMUMMY = 135,
   CAVEMAN = 114,
   CAVEMANBOSS = 117,
@@ -7992,51 +8316,51 @@ declare enum TILE_CODE {
   CHUNK_AIR = 2,
   CHUNK_DOOR = 3,
   CHUNK_GROUND = 1,
-  CLIMBING_GLOVES = 287,
+  CLIMBING_GLOVES = 290,
   CLIMBING_POLE = 36,
-  CLONEGUN = 321,
+  CLONEGUN = 324,
   CLOVER = 107,
   COARSE_LAVA = 235,
   COARSE_WATER = 233,
   COBRA = 132,
-  COBWEB = 340,
+  COBWEB = 343,
   COFFIN = 196,
   COG_DOOR = 239,
   COG_FLOOR = 23,
-  COMPASS = 292,
-  COMPASS_ALIEN = 293,
+  COMPASS = 295,
+  COMPASS_ALIEN = 296,
   CONSTRUCTION_SIGN = 72,
   CONVEYORBELT_LEFT = 61,
   CONVEYORBELT_RIGHT = 62,
   COOKED_TURKEY = 105,
   COOKFIRE = 192,
-  COSMIC_JELLY = 260,
-  COSMIC_ORB = 336,
+  COSMIC_JELLY = 263,
+  COSMIC_ORB = 339,
   COUCH = 80,
-  CRABMAN = 370,
+  CRABMAN = 374,
   CRATE = 92,
   CRATE_BOMBS = 93,
   CRATE_PARACHUTE = 95,
   CRATE_ROPES = 94,
-  CRITTER_BUTTERFLY = 357,
-  CRITTER_CRAB = 360,
-  CRITTER_DRONE = 364,
-  CRITTER_DUNGBEETLE = 356,
-  CRITTER_FIREFLY = 363,
-  CRITTER_FISH = 359,
-  CRITTER_LOCUST = 361,
-  CRITTER_PENGUIN = 362,
-  CRITTER_SLIME = 385,
-  CRITTER_SNAIL = 358,
+  CRITTER_BUTTERFLY = 361,
+  CRITTER_CRAB = 364,
+  CRITTER_DRONE = 368,
+  CRITTER_DUNGBEETLE = 360,
+  CRITTER_FIREFLY = 367,
+  CRITTER_FISH = 363,
+  CRITTER_LOCUST = 365,
+  CRITTER_PENGUIN = 366,
+  CRITTER_SLIME = 389,
+  CRITTER_SNAIL = 362,
   CROCMAN = 131,
   CROSSBOW = 202,
-  CROWN = 298,
+  CROWN = 301,
   CROWN_STATUE = 127,
   CRUSHING_ELEVATOR = 184,
   CRUSHTRAP = 64,
   CRUSHTRAPLARGE = 65,
   CURSED_POT = 109,
-  DIAMOND = 274,
+  DIAMOND = 277,
   DIE = 215,
   DININGTABLE = 76,
   DM_SPAWN_POINT = 50,
@@ -8049,75 +8373,85 @@ declare enum TILE_CODE {
   DRILL = 193,
   DUAT_FLOOR = 25,
   DUSTWALL = 240,
-  EGGPLANT = 272,
+  EGGPLANT = 275,
   EGGPLANT_ALTAR = 157,
   EGGPLANT_CHILD = 159,
-  EGGPLANT_CROWN = 299,
+  EGGPLANT_CROWN = 302,
   EGGPLANT_DOOR = 179,
-  EGGSAC = 341,
-  EGGSAC_BOTTOM = 345,
-  EGGSAC_LEFT = 342,
-  EGGSAC_RIGHT = 344,
-  EGGSAC_TOP = 343,
+  EGGPLUP = 407,
+  EGGSAC = 344,
+  EGGSAC_BOTTOM = 348,
+  EGGSAC_LEFT = 345,
+  EGGSAC_RIGHT = 347,
+  EGGSAC_TOP = 346,
   ELEVATOR = 68,
-  ELIXIR = 284,
-  EMERALD = 275,
+  ELIXIR = 287,
+  EMERALD = 278,
   EMPRESS_GRAVE = 160,
   EMPTY = 0,
   EMPTY_MECH = 111,
   ENTRANCE = 40,
   ENTRANCE_SHORTCUT = 41,
-  EXCALIBUR = 317,
-  EXCALIBUR_BROKEN = 318,
+  EXCALIBUR = 320,
+  EXCALIBUR_BROKEN = 321,
   EXCALIBUR_STONE = 198,
-  EXCALIBUR_STONE_EMPTY = 319,
+  EXCALIBUR_STONE_EMPTY = 322,
   EXIT = 42,
   FACTORY_GENERATOR = 63,
   FALLING_PLATFORM = 58,
-  FIREBUG = 247,
+  FIREBUG = 248,
   FLOOR = 4,
   FLOOR_HARD = 28,
-  FLYING_FISH = 369,
+  FLYING_FISH = 373,
   FORCEFIELD = 217,
-  FORCEFIELD_HORIZONTAL = 330,
-  FORCEFIELD_HORIZONTAL_TOP = 331,
+  FORCEFIELD_HORIZONTAL = 333,
+  FORCEFIELD_HORIZONTAL_TOP = 334,
+  FORCEFIELD_TIMED = 411,
   FORCEFIELD_TOP = 70,
   FOUNTAIN_DRAIN = 143,
   FOUNTAIN_HEAD = 142,
-  FROG = 256,
-  FROG_ORANGE = 257,
+  FROG = 259,
+  FROG_ORANGE = 260,
+  FURNITURE_CHAIR_LOOKING_LEFT = 400,
+  FURNITURE_CHAIR_LOOKING_RIGHT = 401,
+  FURNITURE_CONSTRUCTION_SIGN = 397,
+  FURNITURE_DININGTABLE = 402,
+  FURNITURE_DRESSER = 393,
+  FURNITURE_SIDETABLE = 404,
+  FURNITURE_SINGLEBED = 398,
   GHIST_DOOR2 = 48,
-  GHIST_PRESENT = 354,
+  GHIST_PRESENT = 358,
   GHIST_SHOPKEEPER = 220,
-  GHOST = 261,
-  GHOST_MED_HAPPY = 263,
-  GHOST_MED_SAD = 262,
-  GHOST_SMALL_ANGRY = 264,
-  GHOST_SMALL_HAPPY = 267,
-  GHOST_SMALL_SAD = 265,
-  GHOST_SMALL_SURPRISED = 266,
+  GHOST = 264,
+  GHOST_MED_HAPPY = 266,
+  GHOST_MED_SAD = 265,
+  GHOST_SMALL_ANGRY = 267,
+  GHOST_SMALL_HAPPY = 270,
+  GHOST_SMALL_SAD = 268,
+  GHOST_SMALL_SURPRISED = 269,
   GIANTCLAM = 141,
-  GIANTFOOD = 283,
-  GIANT_FLY = 368,
+  GIANTFOOD = 286,
+  GIANT_FLY = 372,
   GIANT_FROG = 180,
   GIANT_SPIDER = 122,
   GOLDBARS = 91,
-  GOLD_BAR = 273,
+  GOLD_BAR = 276,
   GROWABLE_CLIMBING_POLE = 37,
   GROWABLE_VINE = 35,
-  GRUB = 346,
-  GUN_FREEZERAY = 312,
-  GUN_SHOTGUN = 311,
-  GUN_WEBGUN = 310,
+  GRUB = 349,
+  GUN_FREEZERAY = 315,
+  GUN_SHOTGUN = 314,
+  GUN_WEBGUN = 313,
   GUTS_FLOOR = 27,
   HAUNTED_CORPSE = 110,
-  HEDJET = 297,
+  HEDJET = 300,
   HERMITCRAB = 140,
   HONEY_DOWNWARDS = 200,
   HONEY_UPWARDS = 199,
   HOUYIBOW = 205,
-  HUMPHEAD = 328,
-  HUNDUN = 258,
+  HUMPHEAD = 331,
+  HUNDUN = 261,
+  HUNDUN_SPIKES = 403,
   ICEFLOOR = 152,
   IDOL = 186,
   IDOL_FLOOR = 187,
@@ -8127,7 +8461,7 @@ declare enum TILE_CODE {
   JUMPDOG = 181,
   JUNGLE_FLOOR = 10,
   JUNGLE_SPEAR_TRAP = 57,
-  KAPALA = 296,
+  KAPALA = 299,
   KEY = 203,
   KINGU = 144,
   LADDER = 32,
@@ -8138,17 +8472,17 @@ declare enum TILE_CODE {
   LASER_TRAP = 162,
   LAVA = 234,
   LAVAMANDER = 125,
-  LAVA_POT = 350,
-  LEAF = 268,
+  LAVA_POT = 354,
+  LEAF = 271,
   LEPRECHAUN = 137,
   LIGHTARROW = 206,
   LION_TRAP = 238,
   LITTORCH = 97,
   LITWALLTORCH = 99,
-  LIZARD = 244,
+  LIZARD = 245,
   LOCKEDCHEST = 101,
   LOCKED_DOOR = 49,
-  MACHETE = 316,
+  MACHETE = 319,
   MADAMETUSK = 229,
   MANTRAP = 120,
   MATTOCK = 201,
@@ -8158,16 +8492,16 @@ declare enum TILE_CODE {
   MINEWOOD_FLOOR_NOREPLACE = 13,
   MINISTER = 182,
   MOAI_STATUE = 158,
-  MOLE = 245,
-  MONKEY = 246,
-  MONKEY_GOLD = 337,
+  MOLE = 246,
+  MONKEY = 247,
+  MONKEY_GOLD = 340,
   MOSQUITO = 121,
   MOTHERSHIP_FLOOR = 24,
   MOTHER_STATUE = 178,
-  MOUNT_AXOLOTL = 326,
-  MOUNT_QILIN = 327,
-  MOUNT_ROCKDOG = 325,
-  MOVABLE_SPIKES = 387,
+  MOUNT_AXOLOTL = 329,
+  MOUNT_QILIN = 330,
+  MOUNT_ROCKDOG = 328,
+  MOVABLE_SPIKES = 391,
   MUMMY = 133,
   MUSHROOM_BASE = 103,
   NECROMANCER = 136,
@@ -8178,10 +8512,10 @@ declare enum TILE_CODE {
   OLMEC = 128,
   OLMECSHIP = 173,
   OLMITE = 164,
-  OLMITE_ARMORED = 380,
-  OLMITE_HELMET = 379,
-  OLMITE_NAKED = 378,
-  OSIRIS = 249,
+  OLMITE_ARMORED = 384,
+  OLMITE_HELMET = 383,
+  OLMITE_NAKED = 382,
+  OSIRIS = 252,
   PAGODA_FLOOR = 17,
   PAGODA_PLATFORM = 39,
   PALACE_BOOKCASE = 171,
@@ -8189,55 +8523,59 @@ declare enum TILE_CODE {
   PALACE_CHANDELIER = 169,
   PALACE_ENTRANCE = 166,
   PALACE_FLOOR = 26,
-  PALACE_SIGN = 355,
+  PALACE_SIGN = 359,
   PALACE_TABLE = 167,
   PALACE_TABLE_TRAY = 168,
-  PARACHUTE = 294,
-  PASTE = 291,
+  PANGXIE = 410,
+  PARACHUTE = 297,
+  PASTE = 294,
   PEN_FLOOR = 224,
   PEN_LOCKED_DOOR = 225,
-  PET_MONTY = 332,
-  PET_PERCY = 333,
-  PET_POOCHI = 334,
+  PET_MONTY = 335,
+  PET_PERCY = 336,
+  PET_POOCHI = 337,
   PILLAR = 129,
   PIPE = 175,
-  PITCHERS_MITT = 288,
+  PITCHERS_MITT = 291,
   PLASMA_CANNON = 204,
   PLATFORM = 38,
-  PLAYERBAG = 303,
+  PLAYERBAG = 306,
   POT = 108,
   POTOFGOLD = 90,
   POWDER_KEG = 54,
-  PRESENT = 329,
-  PROTO_SHOPKEEPER = 351,
-  PUNISHBALL = 366,
-  PUNISHBALL_ATTACH = 367,
-  PUNISHBALL_ATTACH_BOTTOM = 384,
-  PUNISHBALL_ATTACH_LEFT = 381,
-  PUNISHBALL_ATTACH_RIGHT = 382,
-  PUNISHBALL_ATTACH_TOP = 383,
+  POWDER_KEG_TIMED = 412,
+  PRESENT = 332,
+  PROTO_GENERATOR = 406,
+  PROTO_SHOPKEEPER = 355,
+  PUNISHBALL = 370,
+  PUNISHBALL_ATTACH = 371,
+  PUNISHBALL_ATTACH_BOTTOM = 388,
+  PUNISHBALL_ATTACH_LEFT = 385,
+  PUNISHBALL_ATTACH_RIGHT = 386,
+  PUNISHBALL_ATTACH_TOP = 387,
   PUSH_BLOCK = 53,
   QUICKSAND = 66,
-  REDSKELETON = 243,
+  QUILLBACK = 396,
+  REDSKELETON = 244,
   REGENERATING_BLOCK = 31,
   ROBOT = 123,
   ROCK = 96,
-  ROPE = 278,
-  ROPE_PILE = 279,
-  ROPE_UNROLLED = 335,
+  ROPE = 281,
+  ROPE_PILE = 282,
+  ROPE_UNROLLED = 338,
   ROYAL_JELLY = 106,
-  RUBY = 277,
-  SAPPHIRE = 276,
-  SCARAB = 259,
-  SCEPTER = 320,
+  RUBY = 280,
+  SAPPHIRE = 279,
+  SCARAB = 262,
+  SCEPTER = 323,
   SCORPION = 116,
-  SEEDED_RUN_UNLOCKER = 285,
-  SHIELD_METAL = 323,
-  SHIELD_WOODEN = 322,
-  SHOES_SPIKE = 290,
-  SHOES_SPRING = 289,
+  SEEDED_RUN_UNLOCKER = 288,
+  SHIELD_METAL = 326,
+  SHIELD_WOODEN = 325,
+  SHOES_SPIKE = 293,
+  SHOES_SPRING = 292,
   SHOPKEEPER = 214,
-  SHOPKEEPER_CLONE = 352,
+  SHOPKEEPER_CLONE = 356,
   SHOPKEEPER_VAT = 155,
   SHOP_DOOR = 207,
   SHOP_ITEM = 221,
@@ -8249,24 +8587,28 @@ declare enum TILE_CODE {
   SIDETABLE = 77,
   SINGLEBED = 73,
   SISTER = 226,
-  SKELETON = 242,
-  SKULL = 386,
-  SKULL_DROP_TRAP = 349,
+  SKELETON = 243,
+  SKELETON_KEY = 395,
+  SKULL = 390,
+  SKULL_DROP_TRAP = 353,
   SLEEPING_HIREDHAND = 222,
-  SLIDINGWALL = 371,
+  SLIDINGWALL = 375,
   SLIDINGWALL_CEILING = 146,
   SLIDINGWALL_SWITCH = 145,
   SNAKE = 113,
   SNAP_TRAP = 112,
   SORCERESS = 134,
   SPARK_TRAP = 163,
-  SPECS = 286,
-  SPIDER = 347,
-  SPIDER_HANGING = 348,
-  SPIKEBALL = 339,
-  SPIKEBALL_NO_BOUNCE = 373,
-  SPIKEBALL_TRAP = 372,
+  SPARROW = 405,
+  SPECS = 289,
+  SPIDER = 350,
+  SPIDER_FALLING = 351,
+  SPIDER_HANGING = 352,
+  SPIKEBALL = 342,
+  SPIKEBALL_NO_BOUNCE = 377,
+  SPIKEBALL_TRAP = 376,
   SPIKES = 51,
+  SPIKES_UPSIDEDOWN = 413,
   SPRING_TRAP = 151,
   STARTING_EXIT = 44,
   STICKY_TRAP = 177,
@@ -8277,13 +8619,14 @@ declare enum TILE_CODE {
   SUNKEN_FLOOR = 20,
   SURFACE_FLOOR = 8,
   SURFACE_HIDDEN_FLOOR = 9,
-  TABLET = 301,
-  TADPOLE = 353,
-  TELEPORTER = 314,
+  TABLET = 304,
+  TADPOLE = 357,
+  TELEPORTER = 317,
   TELESCOPE = 84,
   TEMPLE_FLOOR = 16,
   THIEF = 228,
   THINICE = 153,
+  THIN_ICE = 394,
   THORN_VINE = 56,
   TIAMAT = 172,
   TIKIMAN = 118,
@@ -8295,24 +8638,29 @@ declare enum TILE_CODE {
   TREASURE_CHEST = 88,
   TREASURE_VAULTCHEST = 89,
   TREE_BASE = 102,
-  TRUE_CROWN = 300,
+  TRUE_CROWN = 303,
+  TUN = 408,
   TURKEY = 104,
-  TUTORIAL_MENU_SIGN = 271,
-  TUTORIAL_SPEEDRUN_SIGN = 270,
+  TUTORIAL_MENU_SIGN = 274,
+  TUTORIAL_SPEEDRUN_SIGN = 273,
   TV = 81,
-  UDJAT_EYE = 295,
-  UDJAT_KEY = 269,
+  UDJAT_CHEST = 399,
+  UDJAT_EYE = 298,
+  UDJAT_KEY = 272,
   UDJAT_SOCKET = 194,
-  UDJAT_TARGET = 324,
+  UDJAT_TARGET = 327,
   UFO = 147,
   UPSIDEDOWN_SPIKES = 52,
   USHABTI = 71,
-  VAMPIRE = 248,
+  VAMPIRE = 249,
+  VAMPIRE_FLYING = 250,
+  VAN_HORSING = 409,
   VAULT_WALL = 195,
   VINE = 34,
   VLAD = 126,
-  VLADS_CAPE = 305,
+  VLADS_CAPE = 308,
   VLAD_FLOOR = 22,
+  VLAD_FLYING = 251,
   WALLTORCH = 98,
   WANTED_POSTER = 213,
   WATER = 232,
@@ -8322,8 +8670,8 @@ declare enum TILE_CODE {
   YAMA = 183,
   YANG = 223,
   YETI = 150,
-  YETI_KING = 252,
-  YETI_QUEEN = 253,
+  YETI_KING = 255,
+  YETI_QUEEN = 256,
   ZOO_EXHIBIT = 165
 }
 declare enum TUSK {
@@ -8954,53 +9302,10 @@ declare enum YANG {
   TWO_TURKEYS_BOUGHT = 6
 }
 //was made for fixing arrays of size MAX_PLAYERS, but since I removed the max size because TS doesn't have those, isn't needed
-//declare const MAX_PLAYERS: 4
+declare type MAX_PLAYERS = 4
 
 declare type in_port_t = number
 declare class Logic {}
-declare class Gamepad {
-    enabled: boolean
-    /**
-    * Bitmask of the device digital buttons, as follows. A set bit indicates that the corresponding button is pressed.
-    *
-    * Device button	Bitmask:
-    *
-    * XINPUT_GAMEPAD_DPAD_UP	0x0001
-    *
-    * XINPUT_GAMEPAD_DPAD_DOWN	0x0002
-    *
-    * XINPUT_GAMEPAD_DPAD_LEFT	0x0004
-    *
-    * XINPUT_GAMEPAD_DPAD_RIGHT	0x0008
-    *
-    * XINPUT_GAMEPAD_START	0x0010
-    *
-    * XINPUT_GAMEPAD_BACK	0x0020
-    *
-    * XINPUT_GAMEPAD_LEFT_THUMB	0x0040
-    *
-    * XINPUT_GAMEPAD_RIGHT_THUMB	0x0080
-    *
-    * XINPUT_GAMEPAD_LEFT_SHOULDER	0x0100
-    *
-    * XINPUT_GAMEPAD_RIGHT_SHOULDER	0x0200
-    *
-    * XINPUT_GAMEPAD_A	0x1000
-    *
-    * XINPUT_GAMEPAD_B	0x2000
-    *
-    * XINPUT_GAMEPAD_X	0x4000
-    *
-    * XINPUT_GAMEPAD_Y	0x8000
-    */
-    buttons: number
-    lt: number
-    rt: number
-    lx: number
-    ly: number
-    rx: number
-    ry: number
-}
 
 declare type OnlinePlayerShort = any
 declare type UdpServer = any

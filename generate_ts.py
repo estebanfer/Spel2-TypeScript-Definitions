@@ -46,6 +46,8 @@ header_files = [
     "../src/game_api/script/usertypes/hitbox_lua.hpp",
     "../src/game_api/script/usertypes/socket_lua.hpp",
     "../src/imgui/imgui.h",
+    "../src/game_api/script/usertypes/level_lua.cpp",
+    "../src/game_api/script/usertypes/gui_lua.cpp",
 ]
 api_files = [
     "../src/game_api/script/script_impl.cpp",
@@ -131,6 +133,7 @@ replace = {
     "set<": "Array<",
     "&": "",
     "const string": "string",
+    "ShopType": "SHOP_TYPE",
 
 }
 comment = []
@@ -144,6 +147,7 @@ not_functions = [
     "meta",
     "prng",
 ]
+cpp_type_exceptions = []
 skip = False
 
 
@@ -161,11 +165,12 @@ def rpcfunc(name):
             ret.append(func)
     return ret
 
-#old reArr: r"(Array<\w+), [^>]*?(>+)"
-reArr = re.compile(r"(Array<(?:(?:\w*<\w*, \d>)|(?:\w+))), [^>]*?(>+)") #for removing the max size of arrays
+#old reArr: r"(Array<(?:(?:\w*<\w*, \d>)|(?:\w+))), [^>]*?(>+)"
+reArr = re.compile(r"\bArray(<(?:(?:\w+<.+>)|(?:\w+)), .+)")
 reTuple = re.compile(r"tuple<(.*?)>")
 reOptional = re.compile(r"optional<(.+?)>")
 reBool = re.compile(r"bool\b")
+reMap = re.compile(r"\bmap<")
 reNumber = re.compile(r"\b(?:float|int)\b")
 def replace_all(text, dic):
     for i, j in dic.items():
@@ -176,10 +181,11 @@ def replace_all(text, dic):
             continue
         text = text.replace(i, j)
     text = reNumber.sub("number", text)
+    text = reMap.sub("LuaTable<", text)
     if "Array<" in text: #Array<Array<float, 2>, MAX_PLAYERS>
         newText = text
         while True:
-            newText = reArr.sub(r"\1\2", text)#TODO Possible solution: use tuples to use the max size. bad thing: some arrays show max size as MAX_PLAYERS.
+            newText = reArr.sub(r"FixedSizeArray\1", text)#TODO Possible solution: use tuples to use the max size. bad thing: some arrays show max size as MAX_PLAYERS.
             if newText == text:
                 break
             text = newText
@@ -215,7 +221,7 @@ def cpp_params_to_typescript(params_text):
             return_text += f"{p_name}: {p_type}, "
     return return_text[0:-2]
 
-reConstructorFix = re.compile(r"const (\w+)")
+reConstructorFix = re.compile(r"const (\w+)(?: \w+)?")
 def fix_constructor_param(params_text):
     return reConstructorFix.sub(r"\1: \1", params_text)
 
@@ -310,8 +316,8 @@ for file in header_files:
                     comment.append(m[1])
                 else:
                     m = re.search(
-                        r"^\s*:.*$", line
-                    )  # skip lines that start with a colon (constructor parameter initialization)
+                        r"^\s*(?::|\/\/)", line
+                    )  # skip lines that start with a colon (constructor parameter initialization) or are comments
                     if m:
                         continue
 
@@ -337,9 +343,23 @@ for file in header_files:
                         r"\s*([^\;\{]*)\s+([^\;^\{}]*)\s*(\{[^\}]*\})?\;", line
                     )
                     if m:
-                        member_vars.append(
-                            {"type": m[1], "name": m[2], "comment": comment}
-                        )
+                        if m[1].endswith(",") and not (m[2].endswith(">") or m[2].endswith(")")): #Allows things like imgui ImVec2 'float x, y' and ImVec4 if used, 'float x, y, w, h'. Match will be '[1] = "float x," [2] = "y"'. Some other not exposed variables will be wrongly matched (as already happens).
+                            types_and_vars = m[1]
+                            vars_match = re.search(r"(?: *\w*,)*$", types_and_vars)
+                            vars_except_last = vars_match.group() #Last var is m[2]
+                            start, end = vars_match.span()
+                            vars_type = types_and_vars[:start]
+                            for m_var in re.findall(r"(\w*),", vars_except_last):
+                                member_vars.append(
+                                    {"type": vars_type, "name": m_var, "comment": comment}
+                                )
+                            member_vars.append(
+                                {"type": vars_type, "name": m[2], "comment": comment}
+                            )
+                        else:
+                            member_vars.append(
+                                {"type": m[1], "name": m[2], "comment": comment}
+                            )
                         comment = []
             elif brackets_depth == 0:
                 classes.append(
@@ -375,18 +395,11 @@ for file in api_files:
     data = open(file, "r").read().split("\n")
     for line in data:
         line = line.replace("*", "")
-        a = re.search(r'lua\[[\'"]([^\'"]*)[\'"]\]\s+=\s+(.*);', line)
-        b = re.search(r'lua\[[\'"]([^\'"]*)[\'"]\]\s+=\s+(.*)$', line)
-        if a and not a.group(1).startswith("__"):
-            if not getfunc(a.group(1)):
+        m = re.search(r'lua\[[\'"]([^\'"]*)[\'"]\]\s+=\s+(.*?)(?:;|$)', line)
+        if m and not m.group(1).startswith("__"):
+            if not getfunc(m.group(1)):
                 funcs.append(
-                    {"name": a.group(1), "cpp": a.group(2), "comment": comment}
-                )
-            comment = []
-        elif b and not b.group(1).startswith("__"):
-            if not getfunc(b.group(1)):
-                funcs.append(
-                    {"name": b.group(1), "cpp": b.group(2), "comment": comment}
+                    {"name": m.group(1), "cpp": m.group(2), "comment": comment}
                 )
             comment = []
         c = re.search(r"/// ?(.*)$", line)
@@ -414,10 +427,12 @@ for file in api_files:
             (item for item in classes if item["name"] == cpp_type), dict()
         )
         if "member_funs" not in underlying_cpp_type:
-            continue # whatever, I'm not fixing this
-            raise RuntimeError(
-                "No member_funs found. Did you forget to include a header file at the top of the generate script?"
-            )
+            if cpp_type in cpp_type_exceptions:
+                underlying_cpp_type = {"name": cpp_type, "member_funs": {}, "member_vars": {}}
+            else:
+                raise RuntimeError(
+                        f"No member_funs found in \"{cpp_type}\" while looking for usertypes in file \"{file}\". Did you forget to include a header file at the top of the generate script? (if it isn't the problem then add it to cpp_type_exceptions list)"
+                )
 
         for var in attr:
             if not var:
@@ -436,7 +451,20 @@ for file in api_files:
 
             var_name = var[0]
             cpp = var[1]
-            cpp_name = cpp[cpp.find("::") + 2 :] if cpp.find("::") >= 0 else cpp
+
+            if var[1].startswith("sol::property"):
+                param_match = re.match(fr"sol::property\(\[\]\({underlying_cpp_type['name']}&(\w+)\)", cpp)
+                if param_match:
+                    type_var_name = param_match[1]
+                    m_var_return = re.search(fr"return[^;]*{type_var_name}\.([\w.]+)", cpp)
+                    if m_var_return:
+                        cpp_name = m_var_return[1]
+                        cpp_name = cpp_name.replace(".", "::")
+                        cpp = f"&{underlying_cpp_type['name']}::{cpp_name}"
+                else:
+                    cpp_name = cpp
+            else:
+                cpp_name = cpp[cpp.find("::") + 2 :] if cpp.find("::") >= 0 else cpp
 
             if var[0].startswith("sol::constructors"):
                 for fun in underlying_cpp_type["member_funs"][cpp_type]:
@@ -477,14 +505,21 @@ for file in api_files:
                     (
                         item
                         for item in underlying_cpp_type["member_vars"]
-                        if item["name"] == cpp_name
+                        if item["name"] == cpp_name or (item["name"].endswith("]") and f"{cpp_name}[" in item["name"])
                     ),
                     dict(),
                 )
                 if underlying_cpp_var:
                     type = underlying_cpp_var["type"]
-                    #sig = f"{type} {var_name}"
-                    sig = f"{var_name}: {type}"
+                    sig = ""
+                    if underlying_cpp_var["name"].endswith("]"):
+                        if type == "char":
+                            sig = f"{var_name}: string"
+                        else:
+                            arr_size = underlying_cpp_var["name"][underlying_cpp_var["name"].find("[")+1:-1]
+                            sig = f"{var_name}: FixedSizeArray<{type}, {arr_size}>"
+                    else:
+                        sig = f"{var_name}: {type}"
                     vars.append(
                         {
                             "name": var_name,
@@ -494,7 +529,13 @@ for file in api_files:
                         }
                     )
                 else:
-                    vars.append({"name": var_name, "type": cpp})
+                    m_return_type = re.search(r"->(\w+){", var[1]) #Use var[1] instead of cpp because it could be replaced on the sol::property stuff
+                    if m_return_type:
+                        type = replace_all(m_return_type[1], replace)
+                        sig = f"{var_name}: {type}"
+                        vars.append({"name": var_name, "type": cpp, "signature": sig})
+                    else:
+                        vars.append({"name": var_name, "type": cpp})
         types.append({"name": name, "vars": vars, "base": base})
 
 for file in api_files:
@@ -564,6 +605,9 @@ for line in data:
 
 print(
     """/** @noSelfInFile */
+// Does nothing but fixes docs and showns size
+type FixedSizeArray<T, N extends number> = Array<T>;
+
 declare interface Meta {
     name: string;
     version: string;
@@ -697,10 +741,11 @@ for type in types:
         else:
             #print("not_sig_has")
             name = var["name"]
-            if "->float" in var["type"]:
+            type = var["type"]
+            if "->float" in type:
                 print(f"    {name}: number")
             else:
-                print(f"    {name}: any //unknown")
+                print(f"    {name}: any // {type}")
     print("}")
 
 #print("//## Automatic casting of entities")
@@ -741,53 +786,10 @@ print(enumStr)
 #EXTRA THINGS
 print(
 """//was made for fixing arrays of size MAX_PLAYERS, but since I removed the max size because TS doesn't have those, isn't needed
-//declare const MAX_PLAYERS: 4
+declare type MAX_PLAYERS = 4
 
 declare type in_port_t = number
 declare class Logic {}
-declare class Gamepad {
-    enabled: boolean
-    /**
-    * Bitmask of the device digital buttons, as follows. A set bit indicates that the corresponding button is pressed.
-    *
-    * Device button	Bitmask:
-    *
-    * XINPUT_GAMEPAD_DPAD_UP	0x0001
-    *
-    * XINPUT_GAMEPAD_DPAD_DOWN	0x0002
-    *
-    * XINPUT_GAMEPAD_DPAD_LEFT	0x0004
-    *
-    * XINPUT_GAMEPAD_DPAD_RIGHT	0x0008
-    *
-    * XINPUT_GAMEPAD_START	0x0010
-    *
-    * XINPUT_GAMEPAD_BACK	0x0020
-    *
-    * XINPUT_GAMEPAD_LEFT_THUMB	0x0040
-    *
-    * XINPUT_GAMEPAD_RIGHT_THUMB	0x0080
-    *
-    * XINPUT_GAMEPAD_LEFT_SHOULDER	0x0100
-    *
-    * XINPUT_GAMEPAD_RIGHT_SHOULDER	0x0200
-    *
-    * XINPUT_GAMEPAD_A	0x1000
-    *
-    * XINPUT_GAMEPAD_B	0x2000
-    *
-    * XINPUT_GAMEPAD_X	0x4000
-    *
-    * XINPUT_GAMEPAD_Y	0x8000
-    */
-    buttons: number
-    lt: number
-    rt: number
-    lx: number
-    ly: number
-    rx: number
-    ry: number
-}
 
 declare type OnlinePlayerShort = any
 declare type UdpServer = any
@@ -811,69 +813,22 @@ sys.stdout = sys.__stdout__
 
 #Replace some things
 final_replace_stuff = {
-"""declare class ImVec2 {
-    x: any //unknown
-    y: number                                   x,
-}""":
-"""declare class ImVec2 {
-    x: number
-    y: number
-}""",
 "is_poisoned(): boolean": "is_poisoned: (() => {}) | boolean",
 "drop(entity_to_drop: Entity): void": "drop: ((entity_to_drop: Entity) => {}) | boolean",
 "menu_text_opacity: number\n    menu_text_opacity: number": "menu_text_opacity: number",
-"""declare class ImGuiIO {
-    displaysize: ImVec2
-    framerate: number
-    wantkeyboard: boolean
-    keysdown: any //unknown
+"""keysdown: any //unknown
     keydown: any //unknown
     keypressed: any //unknown
-    keyreleased: any //unknown
-    keyctrl: boolean
-    keyshift: boolean
-    keyalt: boolean
-    keysuper: boolean
-    wantmouse: boolean
-    mousepos: ImVec2
-    mousedown: any //unknown
-    mouseclicked: any //unknown
-    mousedoubleclicked: any //unknown
-    mousewheel: number
-    gamepad: any //unknown
-}""": """declare class ImGuiIO {
-    displaysize: ImVec2
-    framerate: number
-    wantkeyboard: boolean
-    /**
+    keyreleased: any //unknown""":
+"""/**
     * array size: 512 
     * Note: lua starts indexing at 1, you need `keysdown[string.byte('A') + 1]` to find the A key.
     */
     keysdown: Array<boolean>
     keydown(key: number | string): boolean
     keypressed(key: number | string, repeat?: boolean ): boolean
-    keyreleased(key: number | string): boolean
-    keyctrl: boolean
-    keyshift: boolean
-    keyalt: boolean
-    keysuper: boolean
-    wantmouse: boolean
-    mousepos: ImVec2
-    /** array size: 5.
-    * Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Others buttons allows us to track if the mouse is being used by your application
-    */
-    mousedown: Array<boolean>
-    /** array size: 5.
-    * Mouse button went from !Down to Down
-    */
-    mouseclicked: Array<boolean>
-    /** array size: 5.
-    * Has mouse button been double-clicked?
-    */
-    mousedoubleclicked: Array<boolean>
-    mousewheel: number
-    gamepad: Gamepad
-}"""
+    keyreleased(key: number | string): boolean""",
+"gamepad: any // sol::property([](){g_WantUpdateHasGamepad=true;returnget_gamepad()/**/;})": "gamepad: Gamepad"
 }
 
 with open('spel2_declarations_unmodified.d.ts', 'r') as file :
